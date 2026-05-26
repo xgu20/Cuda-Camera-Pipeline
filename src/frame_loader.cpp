@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <fstream>
 #include <stdexcept>
+#include <vector>
 
 // stb_image_write for PNG output
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -13,6 +14,49 @@ FrameLoader::FrameLoader() {
 
 FrameLoader::~FrameLoader() {
     cudaStreamDestroy(stream_);
+}
+
+FrameBuffer FrameLoader::load(const std::string& path, const SensorConfig& cfg) {
+    FrameBuffer buf;
+    buf.width     = cfg.width;
+    buf.height    = cfg.height;
+    buf.channels  = 1;
+    buf.format    = cfg.bayer_format;
+    buf.packing   = cfg.packing;
+    buf.bit_depth = cfg.bit_depth;
+    buf.allocate();   // computes the right stride based on packing
+
+    const size_t expected = buf.sizeBytes();
+
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open raw file: " + path);
+    }
+    const auto file_size = static_cast<size_t>(file.tellg());
+    if (file_size != expected) {
+        throw std::runtime_error(
+            "Raw file size mismatch: " + path +
+            " has " + std::to_string(file_size) + " bytes, expected " +
+            std::to_string(expected) + " for " + std::to_string(cfg.width) +
+            "x" + std::to_string(cfg.height) + " (packing/bit_depth in config?)");
+    }
+
+    file.seekg(0);
+    std::vector<uint8_t> host_bytes(expected);
+    file.read(reinterpret_cast<char*>(host_bytes.data()), expected);
+    if (!file) {
+        throw std::runtime_error("Failed to read " + std::to_string(expected) +
+                                 " bytes from: " + path);
+    }
+
+    CUDA_CHECK(cudaMemcpy(buf.d_data, host_bytes.data(), expected,
+                          cudaMemcpyHostToDevice));
+
+    printf("[FrameLoader] Loaded %s (%dx%d, %zu bytes, packing=%s)\n",
+           path.c_str(), cfg.width, cfg.height, expected,
+           cfg.packing == PixelPacking::PACKED_10_MIPI ? "mipi10" : "unpacked_u16");
+
+    return buf;
 }
 
 FrameBuffer FrameLoader::loadRaw(const std::string& path, int width, int height,

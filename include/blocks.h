@@ -12,6 +12,15 @@
 // to repeat `extern` declarations and can't get out of sync with the impl.
 // ============================================================================
 
+// --- Raw Unpack (packed sensor data -> unpacked uint16 Bayer) ---
+// Default returns the best fully-implemented variant. The Naive / VecStore /
+// VecRW factories below let benchmarks compare implementations side by side.
+std::unique_ptr<ISPBlock> createRawUnpack();
+std::unique_ptr<ISPBlock> createRawUnpackNaive();
+std::unique_ptr<ISPBlock> createRawUnpackVecStore();
+std::unique_ptr<ISPBlock> createRawUnpackVecRW();
+std::unique_ptr<ISPBlock> createRawUnpackVecRWGrp4();
+
 // --- Black Level Correction ---
 std::unique_ptr<ISPBlock> createBlackLevelCorrection(uint16_t black_level);
 std::unique_ptr<ISPBlock> createBlackLevelCorrectionOptimized(uint16_t black_level);

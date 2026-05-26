@@ -1,6 +1,7 @@
 #pragma once
 
 #include "frame_buffer.h"
+#include "sensor_config.h"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -16,11 +17,14 @@ public:
     FrameLoader();
     ~FrameLoader();
 
-    // Load a raw Bayer file into a FrameBuffer on the GPU.
-    //   - path:    path to the raw binary file
-    //   - width:   image width in pixels
-    //   - height:  image height in pixels
-    //   - format:  Bayer pattern (RGGB, BGGR, etc.)
+    // Load a raw Bayer file into a FrameBuffer on the GPU according to the
+    // supplied SensorConfig. The returned FrameBuffer carries the original
+    // packing (e.g. PACKED_10_MIPI); a downstream RawUnpack ISPBlock is
+    // responsible for producing UNPACKED_U16 data.
+    FrameBuffer load(const std::string& path, const SensorConfig& cfg);
+
+    // Legacy entry point: load a flat unpacked uint16 raw file. Kept for
+    // backward compatibility; new code should use load() with a SensorConfig.
     FrameBuffer loadRaw(const std::string& path, int width, int height,
                         PixelFormat format);
 
