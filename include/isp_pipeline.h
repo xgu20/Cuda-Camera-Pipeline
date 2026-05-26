@@ -24,7 +24,13 @@ public:
     // Add a processing block to the end of the pipeline
     void addBlock(std::unique_ptr<ISPBlock> block);
 
-    // Execute all blocks in sequence, returning the final output
+    // Execute all blocks in sequence, returning the final output.
+    //
+    // Ownership: if the pipeline allocated a new buffer for the final
+    // output (i.e. the returned `d_data` differs from `input.d_data`),
+    // ownership is transferred to the caller, who must `.free()` it. If
+    // every block ran in-place, the returned buffer is just a view of
+    // `input` and the caller must not free it.
     FrameBuffer execute(const FrameBuffer& input);
 
     // Print pipeline summary (block names, timing)

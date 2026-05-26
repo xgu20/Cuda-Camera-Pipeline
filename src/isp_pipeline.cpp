@@ -64,6 +64,16 @@ FrameBuffer ISPPipeline::execute(const FrameBuffer& input) {
         current = output;
     }
 
+    // Transfer ownership of the final buffer to the caller, so it survives
+    // the pipeline's lifetime. The caller is responsible for calling .free()
+    // on the returned buffer iff its d_data differs from the input's
+    // d_data (i.e. the pipeline actually allocated something). If every
+    // block ran in-place, `current` is just a view of `input` and must not
+    // be freed by the caller.
+    if (!intermediates_.empty() &&
+        intermediates_.back().d_data == current.d_data) {
+        intermediates_.pop_back();
+    }
     return current;
 }
 

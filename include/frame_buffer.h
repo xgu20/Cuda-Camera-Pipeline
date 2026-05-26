@@ -113,7 +113,10 @@ struct FrameBuffer {
         }
     }
 
-    // Free GPU memory
+    // Free GPU memory. FrameBuffer is a non-owning view: there is no destructor,
+    // so whoever called allocate() (or otherwise produced the d_data) is
+    // responsible for calling free() exactly once when the buffer is no longer
+    // needed. Copies are shallow and share d_data.
     void free() {
         if (d_data) {
             cudaFree(d_data);

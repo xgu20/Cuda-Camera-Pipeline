@@ -88,8 +88,14 @@ int main(int argc, char* argv[]) {
 
     loader.savePNG(result, output_path);
 
+    // The pipeline transfers ownership of the final buffer back to us when
+    // it actually allocated; if every block ran in-place, result aliases
+    // input and we must not double-free.
+    if (result.d_data != input.d_data) {
+        result.free();
+    }
     input.free();
-    // intermediates are freed by pipeline destructor
+    // pipeline destructor frees any remaining intermediates
 
     printf("Done!\n");
     return 0;

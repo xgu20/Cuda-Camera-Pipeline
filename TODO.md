@@ -12,20 +12,6 @@
   实现定义/UB。改用显式 `int` cast，或者直接用 `__vsubss2` / `__vmaxs2`
   PTX SIMD intrinsic 一行搞定 16-bit 饱和减法 + clamp。
 
-- [ ] **`ISPPipeline::execute` 返回值所有权** — `src/isp_pipeline.cpp`
-  当前最终输出被 `intermediates_` 持有，pipeline 析构会一起 free，调用方
-  拿到的 `FrameBuffer` 实际上是悬空预备役。
-  方案：要么把最后一个 buffer 从 `intermediates_` pop 出来交给调用方，
-  要么改返回 `unique_ptr<FrameBuffer, Deleter>`。
-
-- [ ] **`FrameBuffer::d_data` 包成 RAII** — `include/frame_buffer.h`
-  ```cpp
-  struct CudaDeleter { void operator()(void* p) const noexcept { if (p) cudaFree(p); } };
-  using DevicePtr = std::unique_ptr<void, CudaDeleter>;
-  ```
-  让 GPU 内存的所有权由类型表达，move 即转移、copy 直接编译错。这一项
-  做完之后上面 pipeline 的 ownership 困局会自然解开。
-
 - [ ] **`ISPPipeline` 析构 noexcept** — `src/isp_pipeline.cpp`
   析构里调用的 `buf.free()` 内部走 `cudaFree`，但项目里 `CUDA_CHECK` 会
   throw。析构期间抛异常 = `std::terminate`。给析构路径专门写 noexcept
@@ -124,3 +110,7 @@
 - [x] **Demosaic 多 Bayer pattern 支持** — RGGB/BGGR/GRBG/GBRG 全部支持，
       通过模板参数 `<RED_BX, RED_BY>` 编译期特化，零运行时分支；naive
       和 optimized 共用 `demosaicPixel<>` 逻辑。
+- [x] **`ISPPipeline::execute` 返回值所有权** —
+      `execute()` 末尾把最后一个 buffer 从 `intermediates_` pop 出来交给
+      调用方，所有权契约写进 `isp_pipeline.h` 的 doc：返回的 d_data 与
+      input 不同则调用方 `.free()`，否则是 input 的视图、不要 free。
