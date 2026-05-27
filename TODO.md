@@ -90,17 +90,14 @@
   不会触发重新 cmake。顺便考虑把 blocks 抽成 OBJECT library，避免主程序
   和 isp_tests 各编译一遍。
 
-- [ ] **README** — `README.md`
-  目前只有标题。补 build / run / test 三段示例：
-  ```bash
-  cmake -B build && cmake --build build
-  ./build/cuda_isp data/test_rggb_1920x1080_10bit.raw 1920 1080 output.png
-  ctest --test-dir build
-  ```
-
 ---
 
 ## 已完成
+
+- [x] **README** — `README.md`
+      补齐 build / run / test 三段说明，含 JSON sidecar 字段、`synthetic_gen.py`
+      用法、GoogleTest filter 例子，以及开发注意事项（glob `CONFIGURE_DEPENDS`、
+      `stride` 实为 `row_bytes`、pipeline 所有权契约）。
 
 - [x] **抽取 `include/blocks.h` 集中 factory 声明** —
       避免每个调用方重复 `extern`，签名漂移变编译错误而非链接错误。

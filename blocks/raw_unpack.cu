@@ -401,7 +401,7 @@ private:
 // Factory functions — default selects the best fully-implemented variant.
 // ============================================================================
 std::unique_ptr<ISPBlock> createRawUnpack() {
-    return std::make_unique<RawUnpack>(UnpackVariant::VecStore);
+    return std::make_unique<RawUnpack>(UnpackVariant::VecStore); // Fastest
 }
 std::unique_ptr<ISPBlock> createRawUnpackNaive() {
     return std::make_unique<RawUnpack>(UnpackVariant::Naive);
