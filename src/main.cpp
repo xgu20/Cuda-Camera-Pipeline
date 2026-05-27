@@ -35,6 +35,15 @@ void printUsage(const char* prog) {
 }
 
 int main(int argc, char* argv[]) {
+    // Force eager module loading. The CUDA 11.7+ default ("lazy") delays
+    // loading each kernel's fatbin until its first launch, which dumps tens
+    // of ms onto whichever kernel happens to run first (BLC here, observed
+    // ~80 ms for a kernel whose actual runtime is sub-ms). For a one-shot
+    // CLI tool, paying the load cost up-front during context init gives a
+    // much cleaner end-to-end timing. setenv(..., 0) preserves any
+    // user-provided override.
+    setenv("CUDA_MODULE_LOADING", "EAGER", 0);
+
     if (argc < 2) {
         printUsage(argv[0]);
         return 1;

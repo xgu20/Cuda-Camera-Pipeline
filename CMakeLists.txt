@@ -14,8 +14,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-# Auto-detect GPU architecture of the build machine
-set(CMAKE_CUDA_ARCHITECTURES native)
+# Target a fixed list of common archs so we ship SASS for each (no JIT cost
+# on first kernel launch). Override on the command line if you need a
+# specific arch, e.g.  -DCMAKE_CUDA_ARCHITECTURES=89
+#   75 = Turing      (RTX 20xx / T4)
+#   80 = Ampere A100
+#   86 = Ampere      (RTX 30xx / A40)
+#   89 = Ada Lovelace (RTX 40xx)
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES "75;80;86;89")
+endif()
 
 # Export compile commands for IDEs (clangd, etc.)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
