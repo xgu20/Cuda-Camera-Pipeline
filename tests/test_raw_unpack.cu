@@ -265,6 +265,53 @@ TEST_F(RawUnpackTest, Performance_4K) {
 }
 
 // ============================================================================
+// 8-bit promotion: UNPACKED_U8 input must be zero-extended to UNPACKED_U16.
+// ============================================================================
+TEST_F(RawUnpackTest, PromotesU8ToU16) {
+    const int width = 256;
+    const int height = 64;
+    const int bit_depth = 8;
+
+    // Deterministic random uint8 input.
+    std::vector<uint8_t> h_in(static_cast<size_t>(width) * height);
+    std::mt19937 rng(2024);
+    std::uniform_int_distribution<int> dist(0, 255);
+    for (auto& b : h_in) b = static_cast<uint8_t>(dist(rng));
+
+    FrameBuffer fb_in;
+    fb_in.width     = width;
+    fb_in.height    = height;
+    fb_in.channels  = 1;
+    fb_in.format    = PixelFormat::BAYER_RGGB;
+    fb_in.packing   = PixelPacking::UNPACKED_U8;
+    fb_in.bit_depth = bit_depth;
+    fb_in.allocate();
+    ASSERT_EQ(fb_in.sizeBytes(), h_in.size());
+    CUDA_CHECK(cudaMemcpy(fb_in.d_data, h_in.data(), h_in.size(),
+                          cudaMemcpyHostToDevice));
+
+    auto block = createRawUnpack();
+    FrameBuffer fb_out;
+    block->process(fb_in, fb_out, stream_);
+    CUDA_CHECK(cudaStreamSynchronize(stream_));
+
+    // Output should be UNPACKED_U16, same dimensions, with values byte-extended.
+    ASSERT_NE(fb_out.d_data, nullptr);
+    EXPECT_EQ(fb_out.packing, PixelPacking::UNPACKED_U16);
+    EXPECT_EQ(fb_out.width,  width);
+    EXPECT_EQ(fb_out.height, height);
+
+    const auto h_out = downloadUnpacked(fb_out);
+    ASSERT_EQ(h_out.size(), h_in.size());
+    for (size_t i = 0; i < h_in.size(); ++i) {
+        ASSERT_EQ(h_out[i], static_cast<uint16_t>(h_in[i])) << "idx=" << i;
+    }
+
+    fb_out.free();
+    fb_in.free();
+}
+
+// ============================================================================
 // Rejection: MIPI10 with width not a multiple of 4 should fail cleanly.
 // ============================================================================
 TEST_F(RawUnpackTest, RejectsBadWidth) {

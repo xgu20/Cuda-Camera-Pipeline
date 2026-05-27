@@ -36,6 +36,7 @@ enum class PixelFormat {
 //   byte 4 = (P3[1:0]<<6) | (P2[1:0]<<4) | (P1[1:0]<<2) | P0[1:0]
 // ============================================================================
 enum class PixelPacking {
+    UNPACKED_U8,     // 8 bits per pixel; requires bit_depth <= 8
     UNPACKED_U16,    // 16 bits per pixel; low `bit_depth` bits valid
     PACKED_10_MIPI,  // 4 pixels packed into 5 bytes (MIPI CSI-2 RAW10)
 };
@@ -92,6 +93,8 @@ struct FrameBuffer {
     size_t computeRowBytes() const {
         if (isBayer()) {
             switch (packing) {
+                case PixelPacking::UNPACKED_U8:
+                    return static_cast<size_t>(width) * sizeof(uint8_t);
                 case PixelPacking::UNPACKED_U16:
                     return static_cast<size_t>(width) * sizeof(uint16_t);
                 case PixelPacking::PACKED_10_MIPI:

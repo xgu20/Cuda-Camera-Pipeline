@@ -68,8 +68,8 @@ cmake --build build -j
 
 字段说明：
 - `bayer_pattern`: `RGGB` / `BGGR` / `GRBG` / `GBRG`
-- `packing`: `mipi10`（5 字节打包 4 像素）或 `unpacked`（每像素 2 字节小端 uint16）
-- `bit_depth`: 通常 10 或 12
+- `packing`: `mipi10`（5 字节 4 像素）/ `unpacked_u16`（每像素 2 字节小端 uint16）/ `unpacked_u8`（每像素 1 字节，要求 `bit_depth ≤ 8`）
+- `bit_depth`: 1–16；常见 8 / 10 / 12
 
 例子：
 

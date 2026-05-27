@@ -52,9 +52,14 @@ FrameBuffer FrameLoader::load(const std::string& path, const SensorConfig& cfg) 
     CUDA_CHECK(cudaMemcpy(buf.d_data, host_bytes.data(), expected,
                           cudaMemcpyHostToDevice));
 
+    const char* packing_str = "unpacked_u16";
+    switch (cfg.packing) {
+        case PixelPacking::UNPACKED_U8:    packing_str = "unpacked_u8";  break;
+        case PixelPacking::UNPACKED_U16:   packing_str = "unpacked_u16"; break;
+        case PixelPacking::PACKED_10_MIPI: packing_str = "mipi10";       break;
+    }
     printf("[FrameLoader] Loaded %s (%dx%d, %zu bytes, packing=%s)\n",
-           path.c_str(), cfg.width, cfg.height, expected,
-           cfg.packing == PixelPacking::PACKED_10_MIPI ? "mipi10" : "unpacked_u16");
+           path.c_str(), cfg.width, cfg.height, expected, packing_str);
 
     return buf;
 }

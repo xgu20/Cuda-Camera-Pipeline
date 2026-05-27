@@ -250,9 +250,45 @@ __global__ void unpackMipi10VecRWGrp4Kernel(const uint8_t* __restrict__ packed,
 
 
 // ============================================================================
+// 8-bit promotion — UNPACKED_U8 → UNPACKED_U16 (zero-extend each byte).
+//
+// Scalar one-pixel-per-thread kernel. The 8-bit data is small (1 B/pixel,
+// e.g. 4 MB for 2592x1536) and this is bandwidth-bound on the writes
+// (2 B/pixel out > 1 B/pixel in), so a vectorized variant would buy at
+// most a couple of percent and isn't worth the code. Bit-depth is *not*
+// rescaled — Demosaic's normalisation already divides by (2^bit_depth - 1),
+// so 8-bit input goes through naturally as long as the sidecar's
+// `bit_depth` is 8.
+// ============================================================================
+__global__ void promoteU8ToU16Kernel(const uint8_t* __restrict__ in_u8,
+                                     uint16_t* __restrict__ out_u16,
+                                     int width, int height) {
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= width || y >= height) return;
+    const int idx = y * width + x;
+    out_u16[idx] = static_cast<uint16_t>(in_u8[idx]);
+}
+
+// ============================================================================
 // Per-variant launchers — each owns its own grid/block geometry
 // ============================================================================
 namespace {
+
+void launchPromoteU8(const FrameBuffer& in, FrameBuffer& out, cudaStream_t s) {
+    const dim3 block(32, 8);
+    const dim3 grid((in.width  + block.x - 1) / block.x,
+                    (in.height + block.y - 1) / block.y);
+    promoteU8ToU16Kernel<<<grid, block, 0, s>>>(
+        static_cast<const uint8_t*>(in.d_data),
+        static_cast<uint16_t*>(out.d_data),
+        in.width, in.height);
+    cudaError_t e = cudaGetLastError();
+    if (e != cudaSuccess) {
+        fprintf(stderr, "[RawUnpack/PromoteU8] launch error: %s\n",
+                cudaGetErrorString(e));
+    }
+}
 
 void launchNaive(const FrameBuffer& in, FrameBuffer& out, cudaStream_t s) {
     const int groups_per_row = (in.width + 3) / 4;
@@ -342,9 +378,22 @@ public:
             return;
         }
 
-        // Fast path: already unpacked, just alias.
+        // Fast path: already unpacked uint16 → just alias, no work.
         if (input.packing == PixelPacking::UNPACKED_U16) {
             output = input;
+            return;
+        }
+
+        // 8-bit input → allocate a uint16 output and promote (zero-extend).
+        if (input.packing == PixelPacking::UNPACKED_U8) {
+            output.width     = input.width;
+            output.height    = input.height;
+            output.channels  = 1;
+            output.format    = input.format;
+            output.packing   = PixelPacking::UNPACKED_U16;
+            output.bit_depth = input.bit_depth;
+            output.allocate();
+            launchPromoteU8(input, output, stream);
             return;
         }
 

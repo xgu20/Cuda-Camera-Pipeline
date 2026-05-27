@@ -19,10 +19,11 @@ PixelFormat parseBayerFormat(const std::string& s) {
 }
 
 PixelPacking parsePacking(const std::string& s) {
+    if (s == "unpacked_u8")  return PixelPacking::UNPACKED_U8;
     if (s == "unpacked_u16") return PixelPacking::UNPACKED_U16;
     if (s == "mipi10")       return PixelPacking::PACKED_10_MIPI;
     throw std::runtime_error("Unknown packing: " + s +
-                             " (expected unpacked_u16 | mipi10)");
+                             " (expected unpacked_u8 | unpacked_u16 | mipi10)");
 }
 
 }  // namespace
@@ -55,6 +56,11 @@ SensorConfig loadSensorConfig(const std::string& path) {
     if (cfg.packing == PixelPacking::PACKED_10_MIPI && cfg.width % 4 != 0) {
         throw std::runtime_error(
             "sensor config: mipi10 packing requires width to be a multiple of 4");
+    }
+    if (cfg.packing == PixelPacking::UNPACKED_U8 && cfg.bit_depth > 8) {
+        throw std::runtime_error(
+            "sensor config: unpacked_u8 packing requires bit_depth <= 8 (got " +
+            std::to_string(cfg.bit_depth) + ")");
     }
     if (cfg.bit_depth < 1 || cfg.bit_depth > 16) {
         throw std::runtime_error("sensor config: bit_depth must be in [1, 16]");
