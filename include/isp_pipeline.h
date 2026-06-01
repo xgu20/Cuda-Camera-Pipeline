@@ -26,11 +26,12 @@ public:
 
     // Execute all blocks in sequence, returning the final output.
     //
-    // Ownership: if the pipeline allocated a new buffer for the final
-    // output (i.e. the returned `d_data` differs from `input.d_data`),
-    // ownership is transferred to the caller, who must `.free()` it. If
-    // every block ran in-place, the returned buffer is just a view of
-    // `input` and the caller must not free it.
+    // Ownership: the pipeline owns all intermediate buffers (including the
+    // final output) and reuses them across calls. The returned FrameBuffer
+    // is a non-owning view into a pipeline-owned buffer (or into `input` if
+    // every block ran in-place); the caller must NOT free it. The buffers
+    // stay valid until the next execute() with different geometry or until
+    // the pipeline is destroyed.
     FrameBuffer execute(const FrameBuffer& input);
 
     // Print pipeline summary (block names, timing)
@@ -40,8 +41,12 @@ private:
     std::vector<std::unique_ptr<ISPBlock>> blocks_;
     cudaStream_t stream_;
 
-    // Intermediate buffers (managed internally)
+    // Persistent per-block output buffer pool, reused across execute() calls.
+    // Slot i holds the buffer block i allocated (empty for in-place blocks).
+    // Buffers are only (re)allocated when the input geometry changes.
     std::vector<FrameBuffer> intermediates_;
+    int pooled_w_ = 0;   // input geometry the current pool was sized for
+    int pooled_h_ = 0;
 
     // Per-block timing (milliseconds)
     std::vector<float> timings_;

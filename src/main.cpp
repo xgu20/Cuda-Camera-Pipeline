@@ -86,25 +86,33 @@ int main(int argc, char* argv[]) {
     ISPPipeline pipeline;
     pipeline.addBlock(createRawUnpack());                       // packed -> uint16 (no-op if already unpacked)
     pipeline.addBlock(createBlackLevelCorrection(cfg.black_level));
-    pipeline.addBlock(createDemosaic(cfg.bit_depth));
+    // pipeline.addBlock(createManualWhiteBalance(cfg.white_balance_gains, cfg.bit_depth));
+    pipeline.addBlock(createAutoWhiteBalance(cfg.bit_depth));
+    // pipeline.addBlock(createDemosaic(cfg.bit_depth));
+    pipeline.addBlock(createDemosaicOptimized(cfg.bit_depth));
     pipeline.addBlock(createGammaCorrection());
     pipeline.addBlock(createOutputPack());
 
+    // Optional steady-state benchmark: run the pipeline N times on the same
+    // input (set BENCH_ITERS). The first frame pays the one-time buffer
+    // allocation; subsequent frames reuse the pool and show steady-state cost.
+    const char* iters_env = getenv("BENCH_ITERS");
+    const int iters = (iters_env && atoi(iters_env) > 0) ? atoi(iters_env) : 1;
+
     printf("Processing pipeline:\n");
-    FrameBuffer result = pipeline.execute(input);
+    FrameBuffer result{};
+    for (int it = 0; it < iters; ++it) {
+        if (iters > 1) printf("--- frame %d/%d ---\n", it + 1, iters);
+        result = pipeline.execute(input);
+    }
 
     pipeline.printSummary();
 
     loader.savePNG(result, output_path);
 
-    // The pipeline transfers ownership of the final buffer back to us when
-    // it actually allocated; if every block ran in-place, result aliases
-    // input and we must not double-free.
-    if (result.d_data != input.d_data) {
-        result.free();
-    }
+    // `result` is a non-owning view into a pipeline-owned buffer; the
+    // pipeline destructor frees the whole pool. We only own `input`.
     input.free();
-    // pipeline destructor frees any remaining intermediates
 
     printf("Done!\n");
     return 0;

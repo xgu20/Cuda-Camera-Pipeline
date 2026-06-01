@@ -11,6 +11,12 @@
 // a `create*` function here so callers (main.cpp, tests, etc.) don't need
 // to repeat `extern` declarations and can't get out of sync with the impl.
 // ============================================================================
+struct WhiteBalanceGains {
+    float r  = 1.0f;
+    float gr = 1.0f;
+    float gb = 1.0f;
+    float b  = 1.0f;
+};
 
 // --- Raw Unpack (packed sensor data -> unpacked uint16 Bayer) ---
 // Default returns the best fully-implemented variant. The Naive / VecStore /
@@ -35,3 +41,7 @@ std::unique_ptr<ISPBlock> createGammaCorrectionOptimized();
 
 // --- Output Packing ---
 std::unique_ptr<ISPBlock> createOutputPack();
+
+// --- Auto White Balance ---
+std::unique_ptr<ISPBlock> createManualWhiteBalance(WhiteBalanceGains gains, int bit_depth);
+std::unique_ptr<ISPBlock> createAutoWhiteBalance(int bit_depth);  // Gray World

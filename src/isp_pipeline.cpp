@@ -23,11 +23,18 @@ FrameBuffer ISPPipeline::execute(const FrameBuffer& input) {
         return input;
     }
 
-    // Free previous intermediates
-    for (auto& buf : intermediates_) {
-        buf.free();
+    // Reuse the buffer pool across calls. Only discard it when the input
+    // geometry changes — otherwise every block reuses last frame's buffer
+    // and pays no cudaMalloc cost (which dominates allocating blocks).
+    if (input.width != pooled_w_ || input.height != pooled_h_) {
+        for (auto& buf : intermediates_) {
+            buf.free();
+        }
+        intermediates_.clear();
+        pooled_w_ = input.width;
+        pooled_h_ = input.height;
     }
-    intermediates_.clear();
+    intermediates_.resize(blocks_.size());  // one slot per block (empty = unused)
     timings_.clear();
 
     FrameBuffer current = input;
@@ -40,7 +47,11 @@ FrameBuffer ISPPipeline::execute(const FrameBuffer& input) {
         CUDA_CHECK(cudaEventCreate(&start));
         CUDA_CHECK(cudaEventCreate(&stop));
 
-        FrameBuffer output{};
+        // Seed output with this slot's cached buffer. If it already holds
+        // device memory from a previous frame, the block's allocate() is a
+        // no-op (FrameBuffer::allocate returns early when d_data is set), so
+        // we reuse the allocation instead of mallocing again.
+        FrameBuffer output = intermediates_[i];
 
         CUDA_CHECK(cudaEventRecord(start, stream_));
         block->process(current, output, stream_);
@@ -56,24 +67,17 @@ FrameBuffer ISPPipeline::execute(const FrameBuffer& input) {
 
         printf("  [%zu] %-30s  %.3f ms\n", i, block->name(), elapsed_ms);
 
-        // If the block allocated a new buffer (output != input), track it
+        // Remember a freshly-allocated buffer for reuse next frame. In-place
+        // blocks leave output aliasing current, so their slot stays empty.
         if (output.d_data != current.d_data) {
-            intermediates_.push_back(output);
+            intermediates_[i] = output;
         }
 
         current = output;
     }
 
-    // Transfer ownership of the final buffer to the caller, so it survives
-    // the pipeline's lifetime. The caller is responsible for calling .free()
-    // on the returned buffer iff its d_data differs from the input's
-    // d_data (i.e. the pipeline actually allocated something). If every
-    // block ran in-place, `current` is just a view of `input` and must not
-    // be freed by the caller.
-    if (!intermediates_.empty() &&
-        intermediates_.back().d_data == current.d_data) {
-        intermediates_.pop_back();
-    }
+    // The final buffer stays owned by the pool (for reuse next frame); the
+    // caller gets a non-owning view and must not free it.
     return current;
 }
 

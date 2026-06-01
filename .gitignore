@@ -36,6 +36,12 @@ output*.png
 # `git add -f data/the_one_file.raw`.
 data/
 
+# ---------- Profiling artifacts ----------
+# Nsight Systems / Compute reports generated during perf work.
+*.nsys-rep
+*.sqlite
+*.ncu-rep
+
 # ---------- OS junk ----------
 .DS_Store
 Thumbs.db

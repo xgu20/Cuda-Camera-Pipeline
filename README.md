@@ -5,6 +5,7 @@
 当前实现的 block：
 - **raw_unpack** — MIPI10 / packed → uint16
 - **black_level** — 黑电平校正（naive + optimized 两版）
+- **auto_white_balance** — 白平衡：Manual（固定增益）+ GrayWorld（GPU 上统计每通道均值并计算增益，全程无 host 往返）
 - **demosaic** — 双线性去马赛克，支持 RGGB / BGGR / GRBG / GBRG（编译期模板特化）
 - **gamma** — sRGB gamma 校正（float）
 - **output_pack** — float → uint8
@@ -79,6 +80,8 @@ cmake --build build -j
 
 输出会打印每个 block 的耗时 + 总耗时。
 
+设 `BENCH_ITERS=N` 可对同一帧连续跑 N 次，用于测稳态性能：第一帧支付一次性 buffer 分配，后续帧复用 pipeline 的 buffer 池（不再 `cudaMalloc`）。例如 `BENCH_ITERS=5 ./build/cuda_isp ...`。
+
 ### 造测试数据
 
 用任意 PNG/JPEG mosaic 成 Bayer raw：
@@ -112,6 +115,6 @@ ctest --test-dir build -R Demosaic            # 只跑名字含 Demosaic 的
 
 - 想加新 block：在 `blocks/` 下放一个 `.cu`，在 `include/blocks.h` 里加 factory 声明，CMake 根目录的 `file(GLOB)` 会自动捡起来。**注意当前根目录 glob 没加 `CONFIGURE_DEPENDS`，新增 `.cu` 要手动重跑 `cmake -B build` 一次。**
 - `FrameBuffer` 用 plain `cudaMalloc`，没有 pitched 内存；`stride` 字段当前其实是 `row_bytes`。
-- Pipeline 的所有权契约：`execute()` 返回的 `FrameBuffer` 如果 `d_data != input.d_data`，调用方负责 `.free()`；否则它只是 input 的视图。
+- Pipeline 的所有权契约：`ISPPipeline` 持有所有中间 buffer 并**跨帧复用**（buffer 池），只在输入几何尺寸变化时重新分配。`execute()` 返回的 `FrameBuffer` 是 pipeline 所拥有 buffer 的**非拥有视图**（若所有 block 都 in-place，则是 input 的视图），**调用方不得 `.free()`**；buffer 在下次 `execute()` 几何变化或 pipeline 析构时释放。
 
 后续 TODO 见 `TODO.md`。
