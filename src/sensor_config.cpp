@@ -26,6 +26,13 @@ PixelPacking parsePacking(const std::string& s) {
                              " (expected unpacked_u8 | unpacked_u16 | mipi10)");
 }
 
+WhiteBalanceGains parseWhiteBalanceGains(const json& j) {
+    float r = j.value("r", 1.0f);
+    float gr = j.value("gr", 1.0f);
+    float gb = j.value("gb", 1.0f);
+    float b = j.value("b", 1.0f);
+    return WhiteBalanceGains{r, gr, gb, b};
+}
 }  // namespace
 
 SensorConfig loadSensorConfig(const std::string& path) {
@@ -48,6 +55,7 @@ SensorConfig loadSensorConfig(const std::string& path) {
     cfg.bayer_format = parseBayerFormat(j.at("bayer_pattern").get<std::string>());
     cfg.packing      = parsePacking(j.value("packing", std::string("unpacked_u16")));
     cfg.black_level  = static_cast<uint16_t>(j.value("black_level", 0));
+    cfg.white_balance_gains = parseWhiteBalanceGains(j.value("white_balance_gains", json{{"r", 1.0f}, {"gr", 1.0f}, {"gb", 1.0f}, {"b", 1.0f}}));
 
     // Sanity checks
     if (cfg.width <= 0 || cfg.height <= 0) {
@@ -64,6 +72,9 @@ SensorConfig loadSensorConfig(const std::string& path) {
     }
     if (cfg.bit_depth < 1 || cfg.bit_depth > 16) {
         throw std::runtime_error("sensor config: bit_depth must be in [1, 16]");
+    }
+    if (cfg.white_balance_gains.r <= 0 || cfg.white_balance_gains.gr <= 0 || cfg.white_balance_gains.gb <= 0 || cfg.white_balance_gains.b <= 0) {
+        throw std::runtime_error("sensor config: white_balance_gains must be positive");
     }
 
     return cfg;

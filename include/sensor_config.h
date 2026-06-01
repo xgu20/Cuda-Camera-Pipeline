@@ -1,6 +1,7 @@
 #pragma once
 
 #include "frame_buffer.h"
+#include "blocks.h"
 #include <cstdint>
 #include <string>
 
@@ -29,6 +30,7 @@ struct SensorConfig {
     PixelFormat  bayer_format = PixelFormat::BAYER_RGGB;
     PixelPacking packing      = PixelPacking::UNPACKED_U16;
     uint16_t     black_level  = 0;
+    WhiteBalanceGains white_balance_gains = {1.0f, 1.0f, 1.0f, 1.0f};
 };
 
 // Load a sensor config from a JSON file. Throws std::runtime_error on
