@@ -71,6 +71,7 @@ cmake --build build -j
 - `bayer_pattern`: `RGGB` / `BGGR` / `GRBG` / `GBRG`
 - `packing`: `mipi10`（5 字节 4 像素）/ `unpacked_u16`（每像素 2 字节小端 uint16）/ `unpacked_u8`（每像素 1 字节，要求 `bit_depth ≤ 8`）
 - `bit_depth`: 1–16；常见 8 / 10 / 12
+- `white_balance_gains`（可选）: `{ "r": .., "gr": .., "gb": .., "b": .. }`，默认全 `1.0`，须为正数；供 Manual 白平衡使用
 
 例子：
 
