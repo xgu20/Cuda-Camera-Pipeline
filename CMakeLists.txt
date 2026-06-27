@@ -33,7 +33,7 @@ set(CMAKE_CUDA_USE_RESPONSE_FILE_FOR_INCLUDES OFF)
 find_package(CUDAToolkit REQUIRED)
 
 # ---- Collect sources ----
-file(GLOB BLOCK_SOURCES "${CMAKE_SOURCE_DIR}/blocks/*.cu")
+file(GLOB BLOCK_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/blocks/*.cu")
 
 add_executable(cuda_isp
     src/main.cpp

@@ -2,6 +2,8 @@ file(GLOB TEST_SOURCES CONFIGURE_DEPENDS "*.cu" "*.cpp")
 
 add_executable(isp_tests
     ${TEST_SOURCES}
+    ${CMAKE_SOURCE_DIR}/src/isp_pipeline.cpp
+    ${CMAKE_SOURCE_DIR}/src/sensor_config.cpp
 )
 
 target_include_directories(isp_tests PRIVATE
@@ -16,6 +18,7 @@ target_sources(isp_tests PRIVATE ${BLOCK_SOURCES})
 target_link_libraries(isp_tests PRIVATE
     gtest_main
     CUDA::cudart
+    nlohmann_json::nlohmann_json
 )
 
 set_target_properties(isp_tests PROPERTIES

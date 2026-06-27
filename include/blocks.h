@@ -3,6 +3,7 @@
 #include "isp_block.h"
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 // ============================================================================
 // Factory functions for every ISPBlock implementation.
@@ -18,6 +19,14 @@ struct WhiteBalanceGains {
     float b  = 1.0f;
 };
 
+struct ColorCorrectionMatrix {
+    float values[9] = {
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f,
+    };
+};
+
 // --- Raw Unpack (packed sensor data -> unpacked uint16 Bayer) ---
 // Default returns the best fully-implemented variant. The Naive / VecStore /
 // VecRW factories below let benchmarks compare implementations side by side.
@@ -29,11 +38,20 @@ std::unique_ptr<ISPBlock> createRawUnpackVecRWGrp4();
 
 // --- Black Level Correction ---
 std::unique_ptr<ISPBlock> createBlackLevelCorrection(uint16_t black_level);
-std::unique_ptr<ISPBlock> createBlackLevelCorrectionOptimized(uint16_t black_level);
+
+// --- Dead Pixel Correction ---
+std::unique_ptr<ISPBlock> createDeadPixelCorrection(uint16_t th_hot, uint16_t th_dead);
 
 // --- Demosaic ---
 std::unique_ptr<ISPBlock> createDemosaic(int bit_depth);
+std::unique_ptr<ISPBlock> createDemosaic(int bit_depth, uint16_t black_level,
+                                         uint16_t white_level);
 std::unique_ptr<ISPBlock> createDemosaicOptimized(int bit_depth);
+std::unique_ptr<ISPBlock> createDemosaicOptimized(int bit_depth, uint16_t black_level,
+                                                  uint16_t white_level);
+
+// --- Color Correction Matrix ---
+std::unique_ptr<ISPBlock> createColorCorrectionMatrix(ColorCorrectionMatrix matrix);
 
 // --- Gamma Correction ---
 std::unique_ptr<ISPBlock> createGammaCorrection();
@@ -43,5 +61,14 @@ std::unique_ptr<ISPBlock> createGammaCorrectionOptimized();
 std::unique_ptr<ISPBlock> createOutputPack();
 
 // --- Auto White Balance ---
-std::unique_ptr<ISPBlock> createManualWhiteBalance(WhiteBalanceGains gains, int bit_depth);
-std::unique_ptr<ISPBlock> createAutoWhiteBalance(int bit_depth);  // Gray World
+std::unique_ptr<ISPBlock> createManualWhiteBalance(WhiteBalanceGains gains, int bit_depth,
+                                                   uint16_t cut_off = 0);
+std::unique_ptr<ISPBlock> createAutoWhiteBalance(int bit_depth,
+                                                 uint16_t cut_off = 0);  // Gray World
+
+// --- Lens Shading Correction ---
+std::unique_ptr<ISPBlock> createLensShadingCorrection(
+    const std::vector<std::vector<float>>& lut, int grid_width, int grid_height, int bit_depth);
+
+
+

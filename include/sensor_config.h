@@ -1,7 +1,7 @@
 #pragma once
 
-#include "frame_buffer.h"
 #include "blocks.h"
+#include "frame_buffer.h"
 #include <cstdint>
 #include <string>
 
@@ -24,19 +24,24 @@
 // `bayer_pattern` are required.
 // ============================================================================
 struct SensorConfig {
-    int          width        = 0;
-    int          height       = 0;
-    int          bit_depth    = 16;
-    PixelFormat  bayer_format = PixelFormat::BAYER_RGGB;
-    PixelPacking packing      = PixelPacking::UNPACKED_U16;
-    uint16_t     black_level  = 0;
-    WhiteBalanceGains white_balance_gains = {1.0f, 1.0f, 1.0f, 1.0f};
+	int width = 0;
+	int height = 0;
+	int bit_depth = 16;
+	PixelFormat bayer_format = PixelFormat::BAYER_RGGB;
+	PixelPacking packing = PixelPacking::UNPACKED_U16;
+	uint16_t black_level = 0;
+	uint16_t white_level = 65535;
+	uint16_t hot_pixel_threshold = 8000;
+	uint16_t dead_pixel_threshold = 8000;
+	WhiteBalanceGains white_balance_gains = {1.0f, 1.0f, 1.0f, 1.0f};
+	bool has_manual_white_balance_gains = false;
+	ColorCorrectionMatrix color_correction_matrix;
 };
 
 // Load a sensor config from a JSON file. Throws std::runtime_error on
 // missing required fields, malformed JSON, or unknown enum strings.
-SensorConfig loadSensorConfig(const std::string& path);
+SensorConfig loadSensorConfig(const std::string &path);
 
 // Derive the JSON sidecar path from a raw path. Replaces the file extension
 // with ".json", e.g. "data/foo.raw" -> "data/foo.json".
-std::string defaultSidecarPath(const std::string& raw_path);
+std::string defaultSidecarPath(const std::string &raw_path);

@@ -50,6 +50,7 @@ struct FrameBuffer {
     int          height    = 0;
     int          channels  = 1;        // 1 for Bayer, 3 for RGB/YUV
     size_t       stride    = 0;        // Bytes per row
+    size_t       allocation_bytes = 0; // Known allocation size; 0 if unknown/external
     PixelFormat  format    = PixelFormat::BAYER_RGGB;
     PixelPacking packing   = PixelPacking::UNPACKED_U16;
     int          bit_depth = 16;       // valid bits in each pixel value
@@ -106,14 +107,23 @@ struct FrameBuffer {
 
     // Allocate GPU memory matching this buffer's dimensions / format / packing.
     void allocate() {
-        if (d_data) return;  // already allocated
-        stride = computeRowBytes();
-        size_t total = sizeBytes();
+        const size_t required_stride = computeRowBytes();
+        const size_t total = required_stride * static_cast<size_t>(height);
+        if (d_data) {
+            if (allocation_bytes == total && stride == required_stride) {
+                return;
+            }
+            throw std::runtime_error(
+                "FrameBuffer::allocate layout mismatch; owning code must free "
+                "the existing allocation before reusing this view");
+        }
+        stride = required_stride;
         cudaError_t err = cudaMalloc(&d_data, total);
         if (err != cudaSuccess) {
             throw std::runtime_error(std::string("cudaMalloc failed: ") +
                                      cudaGetErrorString(err));
         }
+        allocation_bytes = total;
     }
 
     // Free GPU memory. FrameBuffer is a non-owning view: there is no destructor,
@@ -124,6 +134,7 @@ struct FrameBuffer {
         if (d_data) {
             cudaFree(d_data);
             d_data = nullptr;
+            allocation_bytes = 0;
         }
     }
 };

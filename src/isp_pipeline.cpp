@@ -6,6 +6,7 @@ ISPPipeline::ISPPipeline() {
 }
 
 ISPPipeline::~ISPPipeline() {
+    input_staging_.free();
     // Free any intermediate buffers we allocated
     for (auto& buf : intermediates_) {
         buf.free();
@@ -17,27 +18,64 @@ void ISPPipeline::addBlock(std::unique_ptr<ISPBlock> block) {
     blocks_.push_back(std::move(block));
 }
 
-FrameBuffer ISPPipeline::execute(const FrameBuffer& input) {
-    if (blocks_.empty()) {
-        fprintf(stderr, "[ISPPipeline] Warning: no blocks in pipeline\n");
-        return input;
-    }
+void ISPPipeline::preparePool(const FrameBuffer& input) {
+    const size_t input_bytes = input.sizeBytes();
+    const bool layout_changed =
+        input.width != pooled_w_ ||
+        input.height != pooled_h_ ||
+        input_bytes != pooled_input_bytes_ ||
+        input.format != pooled_format_ ||
+        input.packing != pooled_packing_ ||
+        input.channels != pooled_channels_ ||
+        input.bit_depth != pooled_bit_depth_;
 
-    // Reuse the buffer pool across calls. Only discard it when the input
-    // geometry changes — otherwise every block reuses last frame's buffer
-    // and pays no cudaMalloc cost (which dominates allocating blocks).
-    if (input.width != pooled_w_ || input.height != pooled_h_) {
+    // Reuse the buffer pool across calls. Discard it when any part of the input
+    // layout changes, since equal geometry can still have a different packing
+    // or allocation size.
+    if (layout_changed) {
+        input_staging_.free();
         for (auto& buf : intermediates_) {
             buf.free();
         }
         intermediates_.clear();
         pooled_w_ = input.width;
         pooled_h_ = input.height;
+        pooled_input_bytes_ = input_bytes;
+        pooled_format_ = input.format;
+        pooled_packing_ = input.packing;
+        pooled_channels_ = input.channels;
+        pooled_bit_depth_ = input.bit_depth;
     }
     intermediates_.resize(blocks_.size());  // one slot per block (empty = unused)
     timings_.clear();
+}
 
-    FrameBuffer current = input;
+FrameBuffer ISPPipeline::execute(FrameBuffer& input) {
+    preparePool(input);
+    return executeFrom(input);
+}
+
+FrameBuffer ISPPipeline::executePreservingInput(const FrameBuffer& input) {
+    preparePool(input);
+
+    input_staging_.width = input.width;
+    input_staging_.height = input.height;
+    input_staging_.channels = input.channels;
+    input_staging_.format = input.format;
+    input_staging_.packing = input.packing;
+    input_staging_.bit_depth = input.bit_depth;
+    input_staging_.allocate();
+    CUDA_CHECK(cudaMemcpyAsync(input_staging_.d_data, input.d_data, input.sizeBytes(),
+                               cudaMemcpyDeviceToDevice, stream_));
+
+    return executeFrom(input_staging_);
+}
+
+FrameBuffer ISPPipeline::executeFrom(FrameBuffer current) {
+    if (blocks_.empty()) {
+        fprintf(stderr, "[ISPPipeline] Warning: no blocks in pipeline\n");
+        return current;
+    }
 
     for (size_t i = 0; i < blocks_.size(); ++i) {
         auto& block = blocks_[i];
@@ -55,6 +93,7 @@ FrameBuffer ISPPipeline::execute(const FrameBuffer& input) {
 
         CUDA_CHECK(cudaEventRecord(start, stream_));
         block->process(current, output, stream_);
+        CUDA_CHECK(cudaGetLastError());
         CUDA_CHECK(cudaEventRecord(stop, stream_));
         CUDA_CHECK(cudaEventSynchronize(stop));
 

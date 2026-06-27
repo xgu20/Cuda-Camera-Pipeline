@@ -2,6 +2,24 @@
 #include "isp_block.h"
 #include <cstdio>
 #include <memory>
+#include <stdexcept>
+
+namespace {
+
+float makeNormFactor(int bit_depth, uint16_t black_level, uint16_t white_level) {
+    if (bit_depth < 1 || bit_depth > 16) {
+        throw std::invalid_argument("Demosaic bit_depth must be in [1, 16]");
+    }
+    const uint32_t max_code = (1u << bit_depth) - 1u;
+    const uint32_t white = white_level == 0 ? max_code : white_level;
+    if (black_level >= white || white > max_code) {
+        throw std::invalid_argument(
+            "Demosaic requires black_level < white_level <= max sensor code");
+    }
+    return 1.0f / static_cast<float>(white - black_level);
+}
+
+}  // namespace
 
 // ============================================================================
 // Demosaic — Bilinear Interpolation
@@ -172,16 +190,16 @@ __global__ void demosaicKernelOptimized(const uint16_t* __restrict__ bayer,
 // ============================================================================
 class Demosaic : public ISPBlock {
 public:
-    explicit Demosaic(int bit_depth = 10)
-        : norm_factor_(1.0f / static_cast<float>((1 << bit_depth) - 1)) {}
+    explicit Demosaic(int bit_depth = 10, uint16_t black_level = 0,
+                      uint16_t white_level = 0)
+        : norm_factor_(makeNormFactor(bit_depth, black_level, white_level)) {}
 
     const char* name() const override { return "Demosaic (Bilinear)"; }
 
     void process(const FrameBuffer& input, FrameBuffer& output,
                  cudaStream_t stream) override {
-        if (!input.isBayer()) {
-            fprintf(stderr, "[Demosaic] Error: expected Bayer input\n");
-            return;
+        if (!input.isBayer() || input.packing != PixelPacking::UNPACKED_U16) {
+            throw std::invalid_argument("Demosaic requires unpacked uint16 Bayer input");
         }
 
         output.width    = input.width;
@@ -208,9 +226,7 @@ public:
             case PixelFormat::BAYER_BGGR: LAUNCH(1, 1); break;
             case PixelFormat::BAYER_GRBG: LAUNCH(1, 0); break;
             case PixelFormat::BAYER_GBRG: LAUNCH(0, 1); break;
-            default:
-                fprintf(stderr, "[Demosaic] Error: unsupported Bayer format %d\n",
-                        static_cast<int>(input.format));
+            default: break;
         }
         #undef LAUNCH
     }
@@ -221,16 +237,16 @@ private:
 
 class DemosaicOptimized : public ISPBlock {
 public:
-    explicit DemosaicOptimized(int bit_depth = 10)
-        : norm_factor_(1.0f / static_cast<float>((1 << bit_depth) - 1)) {}
+    explicit DemosaicOptimized(int bit_depth = 10, uint16_t black_level = 0,
+                               uint16_t white_level = 0)
+        : norm_factor_(makeNormFactor(bit_depth, black_level, white_level)) {}
 
     const char* name() const override { return "Demosaic (Optimized)"; }
 
     void process(const FrameBuffer& input, FrameBuffer& output,
                  cudaStream_t stream) override {
-        if (!input.isBayer()) {
-            fprintf(stderr, "[Demosaic] Error: expected Bayer input\n");
-            return;
+        if (!input.isBayer() || input.packing != PixelPacking::UNPACKED_U16) {
+            throw std::invalid_argument("Demosaic requires unpacked uint16 Bayer input");
         }
 
         output.width    = input.width;
@@ -257,9 +273,7 @@ public:
             case PixelFormat::BAYER_BGGR: LAUNCH(1, 1); break;
             case PixelFormat::BAYER_GRBG: LAUNCH(1, 0); break;
             case PixelFormat::BAYER_GBRG: LAUNCH(0, 1); break;
-            default:
-                fprintf(stderr, "[Demosaic] Error: unsupported Bayer format %d\n",
-                        static_cast<int>(input.format));
+            default: break;
         }
         #undef LAUNCH
     }
@@ -271,10 +285,20 @@ private:
 // ============================================================================
 // Factory functions
 // ============================================================================
+std::unique_ptr<ISPBlock> createDemosaic(int bit_depth, uint16_t black_level,
+                                         uint16_t white_level) {
+    return std::make_unique<Demosaic>(bit_depth, black_level, white_level);
+}
+
 std::unique_ptr<ISPBlock> createDemosaic(int bit_depth) {
-    return std::make_unique<Demosaic>(bit_depth);
+    return createDemosaic(bit_depth, 0, 0);
+}
+
+std::unique_ptr<ISPBlock> createDemosaicOptimized(int bit_depth, uint16_t black_level,
+                                                  uint16_t white_level) {
+    return std::make_unique<DemosaicOptimized>(bit_depth, black_level, white_level);
 }
 
 std::unique_ptr<ISPBlock> createDemosaicOptimized(int bit_depth) {
-    return std::make_unique<DemosaicOptimized>(bit_depth);
+    return createDemosaicOptimized(bit_depth, 0, 0);
 }

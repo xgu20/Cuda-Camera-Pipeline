@@ -326,11 +326,7 @@ TEST_F(RawUnpackTest, RejectsBadWidth) {
 
     auto block = createRawUnpackVecStore();
     FrameBuffer fb_out;
-    block->process(fb_in, fb_out, stream_);
-    CUDA_CHECK(cudaStreamSynchronize(stream_));
-
-    // process() should have refused to allocate output_ on bad input.
-    EXPECT_EQ(fb_out.d_data, nullptr);
+    EXPECT_THROW(block->process(fb_in, fb_out, stream_), std::invalid_argument);
 
     fb_in.free();
 }

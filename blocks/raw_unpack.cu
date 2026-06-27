@@ -2,6 +2,7 @@
 #include "isp_block.h"
 #include <cstdio>
 #include <memory>
+#include <stdexcept>
 
 // ============================================================================
 // RawUnpack — convert packed sensor data into UNPACKED_U16 Bayer.
@@ -117,37 +118,6 @@ __global__ void unpackMipi10VecRWKernel(const uint8_t* __restrict__ packed,
                                         size_t packed_stride,
                                         uint16_t* __restrict__ unpacked,
                                         int width, int height) {
-    // TODO(you): implement the vectorized read + write version.
-    //
-    // Suggested structure:
-    //
-    //   const int tx       = blockIdx.x * blockDim.x + threadIdx.x;
-    //   const int gx_base  = tx * VECRW_GROUPS_PER_THREAD;
-    //   const int y        = blockIdx.y * blockDim.y + threadIdx.y;
-    //   if (gx_base * 4 >= width || y >= height) return;
-    //
-    //   const uint8_t* row = packed + packed_stride * y;
-    //
-    //   #pragma unroll
-    //   for (int i = 0; i < VECRW_GROUPS_PER_THREAD; ++i) {
-    //       const int gx = gx_base + i;
-    //       if (gx * 4 >= width) break;           // ragged tail of row
-    //
-    //       // Option A — reuse the shared helper (scalar 5 byte loads):
-    //       ushort4 px = unpackOneGroup(row, gx);
-    //
-    //       // Option B — vectorized load. uchar4 wants 4-byte alignment;
-    //       // row + gx*5 is generally NOT 4-aligned, so be careful.
-    //       //   - Easiest: use __ldg for byte loads to hit the read-only cache.
-    //       //   - Aligned trick: have each thread process 4 groups (= 20 bytes)
-    //       //     and read 5 × uint32_t which IS aligned. Requires reorganizing
-    //       //     the loop to share state across groups within a thread.
-    //
-    //       *reinterpret_cast<ushort4*>(&unpacked[y * width + gx * 4]) = px;
-    //   }
-    //
-    // Once correct, benchmark vs VecStore. If you don't see improvement, try
-    // bumping VECRW_GROUPS_PER_THREAD or changing the block shape in launchVecRW.
     const int tx      = blockIdx.x * blockDim.x + threadIdx.x;
     const int gx_base = tx * VECRW_GROUPS_PER_THREAD;
     const int y       = blockIdx.y * blockDim.y + threadIdx.y;
@@ -283,11 +253,7 @@ void launchPromoteU8(const FrameBuffer& in, FrameBuffer& out, cudaStream_t s) {
         static_cast<const uint8_t*>(in.d_data),
         static_cast<uint16_t*>(out.d_data),
         in.width, in.height);
-    cudaError_t e = cudaGetLastError();
-    if (e != cudaSuccess) {
-        fprintf(stderr, "[RawUnpack/PromoteU8] launch error: %s\n",
-                cudaGetErrorString(e));
-    }
+    CUDA_CHECK(cudaGetLastError());
 }
 
 void launchNaive(const FrameBuffer& in, FrameBuffer& out, cudaStream_t s) {
@@ -324,11 +290,7 @@ void launchVecRW(const FrameBuffer& in, FrameBuffer& out, cudaStream_t s) {
         static_cast<const uint8_t*>(in.d_data), in.stride,
         static_cast<uint16_t*>(out.d_data),
         in.width, in.height);
-    cudaError_t e = cudaGetLastError();
-    if (e != cudaSuccess) {
-        fprintf(stderr, "[RawUnpack/VecRW] launch error: %s\n",
-                cudaGetErrorString(e));
-    }
+    CUDA_CHECK(cudaGetLastError());
 }
 
 void launchVecRWGrp4(const FrameBuffer& in, FrameBuffer& out, cudaStream_t s) {
@@ -343,11 +305,7 @@ void launchVecRWGrp4(const FrameBuffer& in, FrameBuffer& out, cudaStream_t s) {
         static_cast<const uint8_t*>(in.d_data), in.stride,
         static_cast<uint16_t*>(out.d_data),
         in.width, in.height);
-    cudaError_t e = cudaGetLastError();
-    if (e != cudaSuccess) {
-        fprintf(stderr, "[RawUnpack/VecRWGrp4] launch error: %s\n",
-                cudaGetErrorString(e));
-    }
+    CUDA_CHECK(cudaGetLastError());
 }
 
 }  // namespace
@@ -374,8 +332,7 @@ public:
     void process(const FrameBuffer& input, FrameBuffer& output,
                  cudaStream_t stream) override {
         if (!input.isBayer()) {
-            fprintf(stderr, "[RawUnpack] Error: expected Bayer input\n");
-            return;
+            throw std::invalid_argument("RawUnpack requires Bayer input");
         }
 
         // Fast path: already unpacked uint16 → just alias, no work.
@@ -398,9 +355,7 @@ public:
         }
 
         if (input.packing != PixelPacking::PACKED_10_MIPI) {
-            fprintf(stderr, "[RawUnpack] Error: unsupported packing %d\n",
-                    static_cast<int>(input.packing));
-            return;
+            throw std::invalid_argument("RawUnpack received unsupported packing");
         }
 
         // Vector store paths can't handle a partial trailing group.
@@ -408,20 +363,15 @@ public:
         // so callers that build a FrameBuffer manually (e.g. tests) get a
         // clean error instead of an out-of-bounds write.
         if (input.width % 4 != 0) {
-            fprintf(stderr,
-                    "[RawUnpack] Error: MIPI10 unpack requires width %% 4 == 0 "
-                    "(got width=%d)\n", input.width);
-            return;
+            throw std::invalid_argument(
+                "RawUnpack MIPI10 input width must be a multiple of 4");
         }
 
         // VecRWGrp4 processes 4 groups (= 16 pixels) per thread without any
         // tail handling, so it needs groups_per_row to be a multiple of 4.
         if (variant_ == UnpackVariant::VecRWGrp4 && input.width % 16 != 0) {
-            fprintf(stderr,
-                    "[RawUnpack/VecRWGrp4] Error: requires width %% 16 == 0 "
-                    "(got width=%d). Use VecStore / VecRW for arbitrary widths.\n",
-                    input.width);
-            return;
+            throw std::invalid_argument(
+                "RawUnpack VecRWGrp4 input width must be a multiple of 16");
         }
 
         // Allocate the unpacked uint16 output (all variants share this).

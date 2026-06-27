@@ -2,6 +2,7 @@
 #include "isp_block.h"
 #include <cstdio>
 #include <memory>
+#include <stdexcept>
 
 // ============================================================================
 // Black Level Correction (BLC)
@@ -33,8 +34,9 @@ public:
 
     void process(const FrameBuffer& input, FrameBuffer& output,
                  cudaStream_t stream) override {
-        if (!input.isBayer()) {
-            fprintf(stderr, "[BLC] Warning: expected Bayer input\n");
+        if (!input.isBayer() || input.packing != PixelPacking::UNPACKED_U16) {
+            throw std::invalid_argument(
+                "BlackLevelCorrection requires unpacked uint16 Bayer input");
         }
 
         // In-place operation — output aliases input

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <stdexcept>
 
 // ============================================================================
 // Gamma Correction
@@ -45,8 +46,7 @@ public:
   void process(const FrameBuffer &input, FrameBuffer &output,
                cudaStream_t stream) override {
     if (input.format != PixelFormat::RGB_FLOAT) {
-      fprintf(stderr, "[Gamma] Error: expected RGB_FLOAT input\n");
-      return;
+      throw std::invalid_argument("GammaCorrection requires RGB_FLOAT input");
     }
 
     // In-place operation
@@ -106,8 +106,7 @@ public:
   void process(const FrameBuffer &input, FrameBuffer &output,
                cudaStream_t stream) override {
     if (input.format != PixelFormat::RGB_FLOAT) {
-      fprintf(stderr, "[Gamma] Error: expected RGB_FLOAT input\n");
-      return;
+      throw std::invalid_argument("GammaCorrectionOptimized requires RGB_FLOAT input");
     }
 
     output = input;

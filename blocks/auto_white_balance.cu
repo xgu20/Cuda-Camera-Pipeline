@@ -2,6 +2,7 @@
 #include "isp_block.h"
 #include <cstdio>
 #include <memory>
+#include <stdexcept>
 
 // Apply per-channel white-balance gains. `gains` is a device array of 4 floats
 // laid out as [r, gr, gb, b]. Keeping the gains in device memory lets the
@@ -102,8 +103,10 @@ enum class AwbAlgorithm {
 
 class AutoWhiteBalance : public ISPBlock {
 public:
-    AutoWhiteBalance(AwbAlgorithm algo, WhiteBalanceGains gains, int bit_depth) : algo_(algo), gains_(gains), 
-                                                                                cut_off_(1 << bit_depth - 1)  {}
+    AutoWhiteBalance(AwbAlgorithm algo, WhiteBalanceGains gains, int bit_depth,
+                     uint16_t cut_off)
+        : algo_(algo), gains_(gains),
+          cut_off_(makeCutOff(bit_depth, cut_off)) {}
 
     ~AutoWhiteBalance() override {
         if (d_sums_)  cudaFree(d_sums_);
@@ -125,7 +128,15 @@ public:
 
     void process(const FrameBuffer &input, FrameBuffer &output,
             cudaStream_t stream) override {
-        
+        if (!input.isBayer() || input.packing != PixelPacking::UNPACKED_U16) {
+            throw std::invalid_argument(
+                "AutoWhiteBalance requires unpacked uint16 Bayer input");
+        }
+        if ((input.width & 1) != 0 || (input.height & 1) != 0) {
+            throw std::invalid_argument(
+                "AutoWhiteBalance requires even Bayer dimensions");
+        }
+
         output = input;
         auto* d_out = static_cast<uint16_t*>(output.d_data);
         const int   w     = input.width;
@@ -153,10 +164,7 @@ public:
                 case PixelFormat::BAYER_BGGR: STMT(1, 1); break;                         \
                 case PixelFormat::BAYER_GRBG: STMT(1, 0); break;                         \
                 case PixelFormat::BAYER_GBRG: STMT(0, 1); break;                         \
-                default:                                                                 \
-                    fprintf(stderr,                                                      \
-                            "[AutoWhiteBalance] Error: unsupported Bayer format %d\n",  \
-                            static_cast<int>(input.format));                             \
+                default: break;                                                          \
             }
 
         if (algo_ == AwbAlgorithm::GrayWorld) {
@@ -188,6 +196,19 @@ public:
     }
 
 private:
+    static uint16_t makeCutOff(int bit_depth, uint16_t cut_off) {
+        if (bit_depth < 1 || bit_depth > 16) {
+            throw std::invalid_argument(
+                "AutoWhiteBalance bit_depth must be in [1, 16]");
+        }
+        const uint32_t max_code = (1u << bit_depth) - 1u;
+        if (cut_off > max_code) {
+            throw std::invalid_argument(
+                "AutoWhiteBalance cut_off exceeds the sensor code range");
+        }
+        return cut_off == 0 ? static_cast<uint16_t>(max_code) : cut_off;
+    }
+
     AwbAlgorithm algo_;
     WhiteBalanceGains gains_; 
     uint16_t cut_off_;
@@ -198,14 +219,14 @@ private:
     bool                manual_uploaded_ = false;
 };
 
-std::unique_ptr<ISPBlock> createManualWhiteBalance(WhiteBalanceGains gains, int bit_depth) {
-    return std::make_unique<AutoWhiteBalance>(AwbAlgorithm::Manual, gains, bit_depth);
+std::unique_ptr<ISPBlock> createManualWhiteBalance(WhiteBalanceGains gains, int bit_depth,
+                                                   uint16_t cut_off) {
+    return std::make_unique<AutoWhiteBalance>(
+        AwbAlgorithm::Manual, gains, bit_depth, cut_off);
 }
 
-std::unique_ptr<ISPBlock> createAutoWhiteBalance(int bit_depth) {
+std::unique_ptr<ISPBlock> createAutoWhiteBalance(int bit_depth, uint16_t cut_off) {
     // Gains are computed per-frame from image statistics, so the seed value is ignored.
-    return std::make_unique<AutoWhiteBalance>(AwbAlgorithm::GrayWorld, WhiteBalanceGains{}, bit_depth);
+    return std::make_unique<AutoWhiteBalance>(
+        AwbAlgorithm::GrayWorld, WhiteBalanceGains{}, bit_depth, cut_off);
 }
-
-
-

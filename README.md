@@ -7,6 +7,7 @@
 - **black_level** — 黑电平校正（naive + optimized 两版）
 - **auto_white_balance** — 白平衡：Manual（固定增益）+ GrayWorld（GPU 上统计每通道均值并计算增益，全程无 host 往返）
 - **demosaic** — 双线性去马赛克，支持 RGGB / BGGR / GRBG / GBRG（编译期模板特化）
+- **color_correction_matrix** — 3×3 sensor RGB → target RGB 颜色校正矩阵
 - **gamma** — sRGB gamma 校正（float）
 - **output_pack** — float → uint8
 
@@ -39,12 +40,13 @@ cuda_isp/
 
 ```bash
 cmake -B build
-cmake --build build -j
+cmake --build build -j 8
 ```
 
 说明：
 - 默认走 **Release**（`CMakeLists.txt` 强制设置，避免空 build type 关掉 NDEBUG）。Debug 用 `cmake -B build -DCMAKE_BUILD_TYPE=Debug`。
-- `CMAKE_CUDA_ARCHITECTURES native` 会自动探测当前机器 GPU 架构，无需手写 `-gencode`。
+- 默认构建 `75;80;86;89` 四个常见 GPU 架构的 SASS；可用
+  `-DCMAKE_CUDA_ARCHITECTURES=<arch>` 覆盖。
 - 产物：`build/cuda_isp`（主程序）、`build/tests/isp_tests`（测试二进制）。
 - `build/compile_commands.json` 已导出，根目录有软链接给 clangd 用。
 
@@ -63,7 +65,8 @@ cmake --build build -j
   "bit_depth": 10,
   "bayer_pattern": "RGGB",
   "packing": "mipi10",
-  "black_level": 64
+  "black_level": 64,
+  "white_level": 1023
 }
 ```
 
@@ -71,7 +74,12 @@ cmake --build build -j
 - `bayer_pattern`: `RGGB` / `BGGR` / `GRBG` / `GBRG`
 - `packing`: `mipi10`（5 字节 4 像素）/ `unpacked_u16`（每像素 2 字节小端 uint16）/ `unpacked_u8`（每像素 1 字节，要求 `bit_depth ≤ 8`）
 - `bit_depth`: 1–16；常见 8 / 10 / 12
-- `white_balance_gains`（可选）: `{ "r": .., "gr": .., "gb": .., "b": .. }`，默认全 `1.0`，须为正数；供 Manual 白平衡使用
+- `black_level`: 黑电平，必须位于 sensor code range 内
+- `white_level`（可选）: 传感器饱和值，默认 `(1 << bit_depth) - 1`，必须大于 `black_level`
+- `white_balance_gains`（可选）: `{ "r": .., "gr": .., "gb": .., "b": .. }`，
+  须为 finite 正数；存在时使用 Manual 白平衡，省略时使用 GrayWorld AWB
+- `color_correction_matrix`（可选）: row-major 3×3 矩阵，写成 9 个 finite
+  数字的 flat array；默认 identity。真实 sensor → sRGB 输出需要填入标定矩阵
 
 例子：
 
@@ -81,14 +89,18 @@ cmake --build build -j
 
 输出会打印每个 block 的耗时 + 总耗时。
 
-设 `BENCH_ITERS=N` 可对同一帧连续跑 N 次，用于测稳态性能：第一帧支付一次性 buffer 分配，后续帧复用 pipeline 的 buffer 池（不再 `cudaMalloc`）。例如 `BENCH_ITERS=5 ./build/cuda_isp ...`。
+设 `BENCH_ITERS=N` 可对同一帧连续跑 N 次，用于测稳态性能：第一帧支付一次性
+buffer 分配，后续帧复用 pipeline 的 buffer 池（不再 `cudaMalloc`），并始终走
+零拷贝 `execute()`。Packed RAW / unpacked_u8 每轮都会由 RawUnpack 重新生成
+uint16 工作 buffer；`unpacked_u16` 输入会被 in-place block 反复修改，因此最终
+保存的 PNG 只适合辅助观察，benchmark 关注的是稳态耗时。
 
 ### 造测试数据
 
 用任意 PNG/JPEG mosaic 成 Bayer raw：
 
 ```bash
-python3 tools/synthetic_gen.py input.png data/my_test.raw \
+python3 tools/synthetic_gen.py --input input.png --output data/my_test.raw \
     --width 1920 --height 1080
 ```
 
@@ -110,12 +122,18 @@ ctest --test-dir build -R Demosaic            # 只跑名字含 Demosaic 的
 ./build/tests/isp_tests --gtest_list_tests
 ```
 
-每个 block 都有 `Correctness_*` 单测 + `Performance_4K` 基准（带 warm-up + 多次 loop + GB/s 吞吐量），跑全套大概 10–30 秒。
+核心 block 有 correctness 单测；RawUnpack / BLC / Demosaic / Gamma 另有
+`Performance_4K` 基准（带 warm-up + 多次 loop + GB/s 吞吐量）。
 
 ## 开发笔记
 
 - 想加新 block：在 `blocks/` 下放一个 `.cu`，在 `include/blocks.h` 里加 factory 声明，CMake 根目录的 `file(GLOB)` 会自动捡起来。**注意当前根目录 glob 没加 `CONFIGURE_DEPENDS`，新增 `.cu` 要手动重跑 `cmake -B build` 一次。**
 - `FrameBuffer` 用 plain `cudaMalloc`，没有 pitched 内存；`stride` 字段当前其实是 `row_bytes`。
-- Pipeline 的所有权契约：`ISPPipeline` 持有所有中间 buffer 并**跨帧复用**（buffer 池），只在输入几何尺寸变化时重新分配。`execute()` 返回的 `FrameBuffer` 是 pipeline 所拥有 buffer 的**非拥有视图**（若所有 block 都 in-place，则是 input 的视图），**调用方不得 `.free()`**；buffer 在下次 `execute()` 几何变化或 pipeline 析构时释放。
+- Pipeline 的输入/所有权契约：`execute(FrameBuffer&)` 默认零拷贝，in-place
+  block 会修改输入，调用方应把 input 视为已消费；`executePreservingInput()`
+  显式增加一次 device-to-device staging copy。返回值始终是**非拥有视图**，
+  可能 alias input 或 pipeline-owned buffer，调用方不得 `.free()`。
+- Pipeline 已支持 sensor-to-target RGB 的 3×3 CCM；sidecar 未提供矩阵时使用
+  identity，因此未标定配置的 PNG 仍不应视为颜色准确的最终成像结果。
 
 后续 TODO 见 `TODO.md`。

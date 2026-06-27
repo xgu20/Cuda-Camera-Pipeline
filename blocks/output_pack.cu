@@ -2,6 +2,7 @@
 #include "isp_block.h"
 #include <cstdio>
 #include <memory>
+#include <stdexcept>
 
 // ============================================================================
 // Output Packing
@@ -32,8 +33,7 @@ public:
     void process(const FrameBuffer& input, FrameBuffer& output,
                  cudaStream_t stream) override {
         if (input.format != PixelFormat::RGB_FLOAT) {
-            fprintf(stderr, "[OutputPack] Error: expected RGB_FLOAT input\n");
-            return;
+            throw std::invalid_argument("OutputPack requires RGB_FLOAT input");
         }
 
         // Allocate output: same dimensions, uint8
