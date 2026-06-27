@@ -99,3 +99,25 @@ A python helper script is provided at [convert_yml_to_json.py](file:///home/gxh1
 python3 tools/convert_yml_to_json.py
 ```
 This updates all `.json` files under `data/infinite/` that have corresponding `-configs.yml` files.
+
+---
+
+## 公开数据集下载指引 (Public Datasets Download Guide)
+
+为了保持 Git 仓库轻量，所有的 `.raw` 图像文件和 `.zip` 压缩包已在 `.gitignore` 中被忽略，不会提交到仓库中。您可以根据以下指引下载所需的公开数据集并放入相应目录：
+
+### 1. Kaggle Burst RAW Photography Dataset
+- **下载路径**: `data/kaggle/`
+- **数据集来源**: [Burst RAW Photography Dataset (Kaggle)](https://www.kaggle.com/datasets/kamilbryn/burst-raw-photography-dataset)
+- **命令行下载方式**:
+  如果您配置了 Kaggle API 凭证，可以直接运行以下命令进行下载并解压：
+  ```bash
+  mkdir -p data/kaggle
+  kaggle datasets download -d kamilbryn/burst-raw-photography-dataset -p data/kaggle/
+  unzip data/kaggle/burst-raw-photography-dataset.zip -d data/kaggle/
+  ```
+
+### 2. Infinite Dataset (实拍与标定数据)
+- **下载路径**: `data/infinite/`
+- **数据集说明**: 包含 `Indoor1`, `Outdoor1-4` 等真实场景的 8-bit / 10-bit raw 图像及标定使用的 24 色卡图像。
+- *(注：若是私有或特定实验室的数据源，请在此处补充您的网盘下载链接或存储桶地址。)*
