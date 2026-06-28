@@ -59,6 +59,28 @@ ColorCorrectionMatrix parseColorCorrectionMatrix(const json &j) {
 	}
 	return matrix;
 }
+
+std::vector<std::vector<float>> parseLscLut(const json &j, int expected_size) {
+	if (!j.is_array() || j.size() != 4) {
+		throw std::runtime_error("sensor config: lsc_lut must be an array of 4 channel arrays");
+	}
+	std::vector<std::vector<float>> lut(4);
+	for (size_t c = 0; c < 4; ++c) {
+		const auto &ch_json = j.at(c);
+		if (!ch_json.is_array() || ch_json.size() != static_cast<size_t>(expected_size)) {
+			throw std::runtime_error("sensor config: lsc_lut channel " + std::to_string(c) +
+									 " must be an array of size " + std::to_string(expected_size));
+		}
+		lut[c].resize(expected_size);
+		for (size_t i = 0; i < static_cast<size_t>(expected_size); ++i) {
+			lut[c][i] = ch_json.at(i).get<float>();
+			if (!std::isfinite(lut[c][i]) || lut[c][i] <= 0.0f) {
+				throw std::runtime_error("sensor config: lsc_lut values must be finite and positive");
+			}
+		}
+	}
+	return lut;
+}
 } // namespace
 
 SensorConfig loadSensorConfig(const std::string &path) {
@@ -97,6 +119,15 @@ SensorConfig loadSensorConfig(const std::string &path) {
 	if (j.contains("color_correction_matrix")) {
 		cfg.color_correction_matrix =
 			parseColorCorrectionMatrix(j.at("color_correction_matrix"));
+	}
+
+	if (j.contains("lsc_lut")) {
+		cfg.lsc_grid_width = j.at("lsc_grid_width").get<int>();
+		cfg.lsc_grid_height = j.at("lsc_grid_height").get<int>();
+		if (cfg.lsc_grid_width < 2 || cfg.lsc_grid_height < 2) {
+			throw std::runtime_error("sensor config: lsc_grid_width and lsc_grid_height must be at least 2");
+		}
+		cfg.lsc_lut = parseLscLut(j.at("lsc_lut"), cfg.lsc_grid_width * cfg.lsc_grid_height);
 	}
 
 	cfg.enable_blc = j.value("enable_blc", true);

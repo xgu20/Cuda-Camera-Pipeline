@@ -4,6 +4,7 @@
 #include "frame_buffer.h"
 #include <cstdint>
 #include <string>
+#include <vector>
 
 // ============================================================================
 // SensorConfig — metadata describing how to interpret a raw sensor file.
@@ -36,6 +37,16 @@ struct SensorConfig {
 	WhiteBalanceGains white_balance_gains = {1.0f, 1.0f, 1.0f, 1.0f};
 	bool has_manual_white_balance_gains = false;
 	ColorCorrectionMatrix color_correction_matrix;
+
+	// LSC grid and lookup tables (default is identity/flat)
+	int lsc_grid_width = 2;
+	int lsc_grid_height = 2;
+	std::vector<std::vector<float>> lsc_lut = {
+		{1.0f, 1.0f, 1.0f, 1.0f}, // R
+		{1.0f, 1.0f, 1.0f, 1.0f}, // Gr
+		{1.0f, 1.0f, 1.0f, 1.0f}, // Gb
+		{1.0f, 1.0f, 1.0f, 1.0f}  // B
+	};
 
 	// Pipeline stage toggles (default to true)
 	bool enable_blc = true;

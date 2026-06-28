@@ -97,6 +97,10 @@ int main(int argc, char *argv[]) {
 		dpc->setBypass(!cfg.enable_dpc);
 		pipeline.addBlock(std::move(dpc));
 
+		auto lsc = createLensShadingCorrection(cfg.lsc_lut, cfg.lsc_grid_width, cfg.lsc_grid_height, cfg.bit_depth);
+		lsc->setBypass(!cfg.enable_lsc);
+		pipeline.addBlock(std::move(lsc));
+
 		const uint16_t signal_max =
 			static_cast<uint16_t>(cfg.white_level - cfg.black_level);
 		std::unique_ptr<ISPBlock> wb;
