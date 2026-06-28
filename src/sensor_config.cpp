@@ -106,6 +106,7 @@ SensorConfig loadSensorConfig(const std::string &path) {
 	cfg.enable_ccm = j.value("enable_ccm", true);
 	cfg.enable_gamma = j.value("enable_gamma", true);
 	cfg.enable_output_pack = j.value("enable_output_pack", true);
+	cfg.enable_lsc = j.value("enable_lsc", true);
 
 	// Sanity checks
 	if (cfg.width <= 0 || cfg.height <= 0) {

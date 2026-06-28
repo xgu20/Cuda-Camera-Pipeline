@@ -45,6 +45,7 @@ struct SensorConfig {
 	bool enable_ccm = true;
 	bool enable_gamma = true;
 	bool enable_output_pack = true;
+	bool enable_lsc = true;
 };
 
 // Load a sensor config from a JSON file. Throws std::runtime_error on
