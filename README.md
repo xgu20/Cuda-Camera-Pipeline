@@ -7,6 +7,7 @@
 - **black_level** — 黑电平校正（naive + optimized 两版）
 - **auto_white_balance** — 白平衡：Manual（固定增益）+ GrayWorld（GPU 上统计每通道均值并计算增益，全程无 host 往返）
 - **demosaic** — 双线性去马赛克，支持 RGGB / BGGR / GRBG / GBRG（编译期模板特化）
+- **len_shading_correction** — 镜头阴影校正（通过 2D 查找表 LUT 双线性插值进行通道增益补偿）
 - **color_correction_matrix** — 3×3 sensor RGB → target RGB 颜色校正矩阵
 - **gamma** — sRGB gamma 校正（float）
 - **output_pack** — float → uint8
@@ -80,6 +81,9 @@ cmake --build build -j 8
   须为 finite 正数；存在时使用 Manual 白平衡，省略时使用 GrayWorld AWB
 - `color_correction_matrix`（可选）: row-major 3×3 矩阵，写成 9 个 finite
   数字的 flat array；默认 identity。真实 sensor → sRGB 输出需要填入标定矩阵
+- `lsc_grid_width` / `lsc_grid_height`（可选）: LSC 标定网格维度（必须 >= 2），默认均为 `2`
+- `lsc_lut`（可选）: LSC 校正查找表，写成包含 4 个通道（顺序为 R, Gr, Gb, B）数组的 2D 数组，每个通道包含 `lsc_grid_width * lsc_grid_height` 个正数；默认全为 `1.0f`（不校正）
+- `enable_blc` / `enable_dpc` / `enable_lsc` / `enable_wb` / `enable_demosaic` / `enable_ccm` / `enable_gamma` / `enable_output_pack`（可选）: 运行时开启或关闭相应 block（默认为 `true`，设为 `false` 可实现动态 Bypass）
 
 例子：
 
