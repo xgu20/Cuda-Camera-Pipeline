@@ -88,7 +88,11 @@ cmake --build build -j 8
 例子：
 
 ```bash
+# 正常运行单帧
 ./build/cuda_isp data/test_rggb_1920x1080_10bit.raw output.png
+
+# 连续执行 100 次（Benchmark 稳态性能）
+BENCH_ITERS=100 ./build/cuda_isp data/test_rggb_1920x1080_10bit.raw output.png
 ```
 
 输出会打印每个 block 的耗时 + 总耗时。
