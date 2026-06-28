@@ -12,6 +12,63 @@
 - **gamma** — sRGB gamma 校正（float）
 - **output_pack** — float → uint8
 
+## ISP 流水线架构 (Pipeline Architecture)
+
+以下是 `cuda_isp` 当前完整的数据流水线与色彩域转换链路图（可在支持 Markdown 渲染的任意阅读器中获得最佳字型排版效果）：
+
+```text
+       ╔═════════════════════════════════════════════════════════╗
+       ║                  Input: Raw Sensor File                 ║
+       ╚═════════════════════════════════════════════════════════╝
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  [RAW Domain]  Processing Bayer CFA Mosaic Pattern                     │
+├────────────────────────────────────────────────────────────────────────┤
+│  [0] RawUnpack                ░░░░░░░░░░░░░░░░░░░░░░  Unpack bit-depth │
+│       └─ packed (e.g. MIPI10) ──► unpacked uint16 (Bayer)              │
+│                                                                        │
+│  [1] BlackLevelCorrection     ░░░░░░░░░░░░░░░░░░░░░░  Deduct baseline  │
+│       └─ max(0, pixel - black_level)                                   │
+│                                                                        │
+│  [2] DeadPixelCorrection      ░░░░░░░░░░░░░░░░░░░░░░  Defective filter │
+│       └─ Detect and replace hot/dead pixels with neighbors             │
+│                                                                        │
+│  [3] LensShadingCorrection    ░░░░░░░░░░░░░░░░░░░░░░  Vignette fix     │
+│       └─ Scale R/Gr/Gb/B channels using bilinear grid LUT              │
+│                                                                        │
+│  [4] WhiteBalance             ░░░░░░░░░░░░░░░░░░░░░░  Gain scaling     │
+│       └─ Manual / Auto (GrayWorld) gain correction                     │
+└────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  [Interpolation]  Bayer CFA to RGB Transition                          │
+├────────────────────────────────────────────────────────────────────────┤
+│  [5] Demosaic (Optimized)     █▓▒░░█▓▒░░█▓▒░░█▓▒░░░░  Bayer ──► RGB    │
+│       └─ Bilinear cross-channel color reconstruction                   │
+└────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  [RGB Domain]  Color Space Correction & Output Rendering                │
+├────────────────────────────────────────────────────────────────────────┤
+│  [6] ColorCorrectionMatrix    █▓▒░  CCM (3x3 Matrix)                   │
+│       └─ Convert sensor RGB to target sRGB color space                 │
+│                                                                        │
+│  [7] GammaCorrection (sRGB)   █▓▒░  Non-linear curve                   │
+│       └─ Apply non-linear sRGB gamma compression                       │
+│                                                                        │
+│  [8] OutputPack (float->u8)   █▓▒░  Quantize & clamp                   │
+│       └─ Normalize, clamp, and pack floats to 8-bit RGB array          │
+└────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+       ╔═════════════════════════════════════════════════════════╗
+       ║                   Output: Standard PNG                  ║
+       ╚═════════════════════════════════════════════════════════╝
+```
+
 ## 目录结构
 
 ```
