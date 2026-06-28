@@ -32,10 +32,10 @@
 - [ ] **Sensor Linearization / OECF** — 在 BLC 后用每 Bayer 通道 LUT 修正传感器
   非线性响应；sidecar 支持 LUT 与输入/输出 bit depth。
 
-- [ ] **Lens Shading Correction (LSC)** — 在 Bayer 域应用四通道二维 gain map，
+- [x] **Lens Shading Correction (LSC)** — 在 Bayer 域应用四通道二维 gain map，
   修正镜头暗角与 color shading；支持标定网格的双线性插值。
 
-- [ ] **Dead / Defective Pixel Correction (DPC)** — Demosaic 前检测 hot/dead pixel，
+- [x] **Dead / Defective Pixel Correction (DPC)** — Demosaic 前检测 hot/dead pixel，
   使用同色 Bayer 邻居恢复；避免坏点被 demosaic 扩散成彩色斑点。
 
 - [ ] **Digital Gain / Exposure Compensation** — 在 Bayer linear 域应用可配置 gain，
