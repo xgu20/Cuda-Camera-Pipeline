@@ -16,9 +16,45 @@
 
 以下是 `cuda_isp` 当前的完整数据流水线与处理域划分图：
 
-![CUDA ISP Pipeline](docs/pipeline.svg)
+```mermaid
+graph TD
+    %% Define Styles
+    classDef raw fill:#e0f7fa,stroke:#00838f,stroke-width:2px;
+    classDef trans fill:#fffde7,stroke:#fbc02d,stroke-width:2px;
+    classDef rgb fill:#ffebee,stroke:#c62828,stroke-width:2px;
+    classDef nonlinear fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px;
 
-您可以直接在本地查看或编辑 PlantUML 架构源文件：[docs/pipeline.puml](docs/pipeline.puml)
+    %% Subgraphs for Domains
+    subgraph RAW ["RAW Domain (Bayer CFA)"]
+        unpack["[0] RawUnpack<br>Unpacks packed RAW (e.g. MIPI10 -> uint16)"]:::raw
+        blc["[1] BlackLevelCorrection<br>Baseline subtraction & clamping"]:::raw
+        dpc["[2] DeadPixelCorrection<br>Detects and replaces hot/dead pixels"]:::raw
+        lsc["[3] LensShadingCorrection<br>Vignetting compensation via grid LUT"]:::raw
+        wb["[4] WhiteBalance<br>Manual or Auto (GrayWorld) gains"]:::raw
+        
+        unpack --> blc --> dpc --> lsc --> wb
+    end
+
+    subgraph Transition ["CFA to RGB Transition"]
+        demosaic["[5] Demosaic (Optimized)<br>Bilinear interpolation"]:::trans
+    end
+
+    subgraph RGB ["Linear RGB Domain"]
+        ccm["[6] ColorCorrectionMatrix<br>3x3 matrix conversion"]:::rgb
+    end
+
+    subgraph Output ["Non-Linear RGB & Output Domain"]
+        gamma["[7] GammaCorrection (sRGB)<br>Non-linear display curve"]:::nonlinear
+        pack["[8] OutputPack<br>Normalizes and clamps (float -> uint8)"]:::nonlinear
+        
+        gamma --> pack
+    end
+
+    %% Connect Subgraphs
+    wb --> demosaic
+    demosaic --> ccm
+    ccm --> gamma
+```
 
 ## 目录结构
 

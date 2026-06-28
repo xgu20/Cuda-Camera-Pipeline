@@ -1,0 +1,35 @@
+---
+description: 本机环境与工具链信息（CUDA ISP 项目），避免常见踩坑
+alwaysApply: true
+---
+
+# 环境信息
+
+运行在 **WSL2（Ubuntu）** 上的 CUDA 项目。已确认的工具链版本：
+
+| 工具 | 版本 |
+|------|------|
+| CUDA Toolkit (`nvcc`) | 12.9 (V12.9.86) |
+| GPU 驱动 / `nvidia-smi` | **WSL2 下被屏蔽，见下方** |
+| CMake | 4.3.2 |
+| GCC | 13.3.0 (Ubuntu 24.04) |
+| C++ / CUDA 标准 | C++17 |
+
+## 关键坑点
+
+- **`nvidia-smi` 会报错** `Failed to initialize NVML: GPU access blocked by the operating system`。这是当前 WSL2 配置的限制，**不代表没有 GPU 或环境坏了**。不要据此判断 CUDA 不可用，也不要尝试 reinstall 驱动。用 `nvcc --version` 确认工具链即可。
+- **沙箱网络是 allowlist**。CMake 首次 configure 用 `FetchContent` 拉取 `nlohmann/json` 和 `googletest`，需要联网。若在沙箱里失败，用 `required_permissions: ["full_network"]` 重跑。`build/` 已存在并配置过，多数情况无需重新拉取。
+- **CMake 实际锁定固定架构** `75;80;86;89`（见 `CMakeLists.txt`），并非 README 写的 `native`。改架构用 `-DCMAKE_CUDA_ARCHITECTURES=<sm>`。
+- **新增 `blocks/*.cu` 必须手动重跑** `cmake -B build`：根目录 `file(GLOB)` 没加 `CONFIGURE_DEPENDS`，否则新 kernel 不会被编译进去。
+- 默认构建类型被强制为 **Release**（空 build type 会关掉优化并启用 assert）。调试用 `-DCMAKE_BUILD_TYPE=Debug`。
+
+## 常用命令
+
+```bash
+cmake -B build && cmake --build build -j          # 构建
+./build/cuda_isp data/<x>.raw out.png             # 运行（需同名 .json sidecar）
+ctest --test-dir build --output-on-failure        # 测试
+./build/tests/isp_tests --gtest_filter='*Perf*'   # 跑性能基准
+```
+
+产物：`build/cuda_isp`、`build/tests/isp_tests`。

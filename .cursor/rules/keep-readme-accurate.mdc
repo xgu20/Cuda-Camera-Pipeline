@@ -1,0 +1,18 @@
+---
+description: 改完代码后核对 README 是否仍然准确
+alwaysApply: true
+---
+
+# 改完代码后核对 README
+
+每次完成代码改动（新增/修改 block、改 CLI 参数、改构建配置、改 sidecar 字段、改目录结构等），**结束前必须回看 `README.md`**，确认它仍然准确。
+
+重点核对：
+
+- **block 列表**（README「当前实现的 block」）是否和 `blocks/*.cu` + `include/blocks.h` 一致
+- **构建/运行/测试命令**是否仍能照抄执行
+- **sidecar JSON 字段**（`bayer_pattern` / `packing` / `bit_depth` 等取值）是否和 `src/sensor_config.cpp`、`frame_loader.cpp` 实际支持的一致
+- **目录结构**、**依赖版本**是否仍然成立
+- 「开发笔记」里的契约（FrameBuffer 所有权、glob 无 `CONFIGURE_DEPENDS` 等）是否仍然成立
+
+发现不一致时：能直接修就顺手更新 README；不确定改文档还是改代码时，向用户说明分歧点再决定。不要让 README 与代码悄悄漂移。
