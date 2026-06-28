@@ -84,26 +84,47 @@ int main(int argc, char *argv[]) {
 
 		// --- Build the ISP pipeline ---
 		ISPPipeline pipeline;
-		pipeline.addBlock(
-			createRawUnpack()); // packed -> uint16 (no-op if already unpacked)
-		pipeline.addBlock(createBlackLevelCorrection(cfg.black_level));
-		pipeline.addBlock(createDeadPixelCorrection(cfg.hot_pixel_threshold,
-													cfg.dead_pixel_threshold));
+
+		auto raw_unpack = createRawUnpack();
+		pipeline.addBlock(std::move(raw_unpack));
+
+		auto blc = createBlackLevelCorrection(cfg.black_level);
+		blc->setBypass(!cfg.enable_blc);
+		pipeline.addBlock(std::move(blc));
+
+		auto dpc = createDeadPixelCorrection(cfg.hot_pixel_threshold,
+											 cfg.dead_pixel_threshold);
+		dpc->setBypass(!cfg.enable_dpc);
+		pipeline.addBlock(std::move(dpc));
+
 		const uint16_t signal_max =
 			static_cast<uint16_t>(cfg.white_level - cfg.black_level);
+		std::unique_ptr<ISPBlock> wb;
 		if (cfg.has_manual_white_balance_gains) {
-			pipeline.addBlock(createManualWhiteBalance(
-				cfg.white_balance_gains, cfg.bit_depth, signal_max));
+			wb = createManualWhiteBalance(
+				cfg.white_balance_gains, cfg.bit_depth, signal_max);
 		} else {
-			pipeline.addBlock(
-				createAutoWhiteBalance(cfg.bit_depth, signal_max));
+			wb = createAutoWhiteBalance(cfg.bit_depth, signal_max);
 		}
-		pipeline.addBlock(createDemosaicOptimized(
-			cfg.bit_depth, cfg.black_level, cfg.white_level));
-		pipeline.addBlock(
-			createColorCorrectionMatrix(cfg.color_correction_matrix));
-		pipeline.addBlock(createGammaCorrection());
-		pipeline.addBlock(createOutputPack());
+		wb->setBypass(!cfg.enable_wb);
+		pipeline.addBlock(std::move(wb));
+
+		auto demosaic = createDemosaicOptimized(
+			cfg.bit_depth, cfg.black_level, cfg.white_level);
+		demosaic->setBypass(!cfg.enable_demosaic);
+		pipeline.addBlock(std::move(demosaic));
+
+		auto ccm = createColorCorrectionMatrix(cfg.color_correction_matrix);
+		ccm->setBypass(!cfg.enable_ccm);
+		pipeline.addBlock(std::move(ccm));
+
+		auto gamma = createGammaCorrection();
+		gamma->setBypass(!cfg.enable_gamma);
+		pipeline.addBlock(std::move(gamma));
+
+		auto output_pack = createOutputPack();
+		output_pack->setBypass(!cfg.enable_output_pack);
+		pipeline.addBlock(std::move(output_pack));
 
 		// Optional steady-state benchmark: run the pipeline N times on the same
 		// input (set BENCH_ITERS). The first frame pays the one-time buffer

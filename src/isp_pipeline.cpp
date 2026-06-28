@@ -91,20 +91,26 @@ FrameBuffer ISPPipeline::executeFrom(FrameBuffer current) {
         // we reuse the allocation instead of mallocing again.
         FrameBuffer output = intermediates_[i];
 
-        CUDA_CHECK(cudaEventRecord(start, stream_));
-        block->process(current, output, stream_);
-        CUDA_CHECK(cudaGetLastError());
-        CUDA_CHECK(cudaEventRecord(stop, stream_));
-        CUDA_CHECK(cudaEventSynchronize(stop));
-
         float elapsed_ms = 0.0f;
-        CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, start, stop));
-        timings_.push_back(elapsed_ms);
+        if (block->isBypass()) {
+            output = current;
+            timings_.push_back(0.0f);
+            printf("  [%zu] %-30s  (Bypassed)\n", i, block->name());
+        } else {
+            CUDA_CHECK(cudaEventRecord(start, stream_));
+            block->process(current, output, stream_);
+            CUDA_CHECK(cudaGetLastError());
+            CUDA_CHECK(cudaEventRecord(stop, stream_));
+            CUDA_CHECK(cudaEventSynchronize(stop));
+
+            CUDA_CHECK(cudaEventElapsedTime(&elapsed_ms, start, stop));
+            timings_.push_back(elapsed_ms);
+
+            printf("  [%zu] %-30s  %.3f ms\n", i, block->name(), elapsed_ms);
+        }
 
         CUDA_CHECK(cudaEventDestroy(start));
         CUDA_CHECK(cudaEventDestroy(stop));
-
-        printf("  [%zu] %-30s  %.3f ms\n", i, block->name(), elapsed_ms);
 
         // Remember a freshly-allocated buffer for reuse next frame. In-place
         // blocks leave output aliasing current, so their slot stays empty.
@@ -125,8 +131,12 @@ void ISPPipeline::printSummary() const {
     float total = 0.0f;
     for (size_t i = 0; i < blocks_.size(); ++i) {
         float t = (i < timings_.size()) ? timings_[i] : 0.0f;
-        printf("  [%zu] %-30s  %.3f ms\n", i, blocks_[i]->name(), t);
-        total += t;
+        if (blocks_[i]->isBypass()) {
+            printf("  [%zu] %-30s  (Bypassed)\n", i, blocks_[i]->name());
+        } else {
+            printf("  [%zu] %-30s  %.3f ms\n", i, blocks_[i]->name(), t);
+            total += t;
+        }
     }
     printf("  %-34s  %.3f ms\n", "TOTAL", total);
     printf("============================\n\n");

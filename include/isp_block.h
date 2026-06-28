@@ -29,4 +29,11 @@ public:
     // a new output buffer with the correct dimensions/format.
     virtual void process(const FrameBuffer& input, FrameBuffer& output,
                          cudaStream_t stream) = 0;
+
+    // Bypass getters / setters
+    bool isBypass() const { return bypass_; }
+    void setBypass(bool bypass) { bypass_ = bypass; }
+
+private:
+    bool bypass_ = false;
 };

@@ -99,6 +99,14 @@ SensorConfig loadSensorConfig(const std::string &path) {
 			parseColorCorrectionMatrix(j.at("color_correction_matrix"));
 	}
 
+	cfg.enable_blc = j.value("enable_blc", true);
+	cfg.enable_dpc = j.value("enable_dpc", true);
+	cfg.enable_wb = j.value("enable_wb", true);
+	cfg.enable_demosaic = j.value("enable_demosaic", true);
+	cfg.enable_ccm = j.value("enable_ccm", true);
+	cfg.enable_gamma = j.value("enable_gamma", true);
+	cfg.enable_output_pack = j.value("enable_output_pack", true);
+
 	// Sanity checks
 	if (cfg.width <= 0 || cfg.height <= 0) {
 		throw std::runtime_error(

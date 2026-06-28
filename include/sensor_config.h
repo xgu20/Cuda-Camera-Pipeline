@@ -36,6 +36,15 @@ struct SensorConfig {
 	WhiteBalanceGains white_balance_gains = {1.0f, 1.0f, 1.0f, 1.0f};
 	bool has_manual_white_balance_gains = false;
 	ColorCorrectionMatrix color_correction_matrix;
+
+	// Pipeline stage toggles (default to true)
+	bool enable_blc = true;
+	bool enable_dpc = true;
+	bool enable_wb = true;
+	bool enable_demosaic = true;
+	bool enable_ccm = true;
+	bool enable_gamma = true;
+	bool enable_output_pack = true;
 };
 
 // Load a sensor config from a JSON file. Throws std::runtime_error on
