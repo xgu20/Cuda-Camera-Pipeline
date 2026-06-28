@@ -1,37 +1,20 @@
-graph TD
-    %% Define Styles
-    classDef raw fill:#e0f7fa,stroke:#00838f,stroke-width:2px;
-    classDef trans fill:#fffde7,stroke:#fbc02d,stroke-width:2px;
-    classDef rgb fill:#ffebee,stroke:#c62828,stroke-width:2px;
-    classDef nonlinear fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px;
+graph LR
+    %% Style Definitions (Curated Pastel Palette)
+    classDef raw fill:#E0F2F1,stroke:#00796B,stroke-width:1.5px,rx:8px,ry:8px,color:#004D40,font-weight:bold,font-family:Helvetica;
+    classDef trans fill:#FFF9C4,stroke:#FBC02D,stroke-width:1.5px,rx:8px,ry:8px,color:#F57F17,font-weight:bold,font-family:Helvetica;
+    classDef rgb fill:#FFEBEE,stroke:#D32F2F,stroke-width:1.5px,rx:8px,ry:8px,color:#B71C1C,font-weight:bold,font-family:Helvetica;
+    classDef nonlinear fill:#F3E5F5,stroke:#7B1FA2,stroke-width:1.5px,rx:8px,ry:8px,color:#4A148C,font-weight:bold,font-family:Helvetica;
 
-    %% Subgraphs for Domains
-    subgraph RAW ["RAW Domain (Bayer CFA)"]
-        unpack["[0] RawUnpack<br>Unpacks packed RAW (e.g. MIPI10 -> uint16)"]:::raw
-        blc["[1] BlackLevelCorrection<br>Baseline subtraction & clamping"]:::raw
-        dpc["[2] DeadPixelCorrection<br>Detects and replaces hot/dead pixels"]:::raw
-        lsc["[3] LensShadingCorrection<br>Vignetting compensation via grid LUT"]:::raw
-        wb["[4] WhiteBalance<br>Manual or Auto (GrayWorld) gains"]:::raw
-        
-        unpack --> blc --> dpc --> lsc --> wb
-    end
+    %% Nodes
+    Unpack("Raw Unpack"):::raw
+    BLC("Black Level"):::raw
+    DPC("Dead Pixel"):::raw
+    LSC("Lens Shading"):::raw
+    WB("White Balance"):::raw
+    Demosaic("Demosaic"):::trans
+    CCM("Color Matrix"):::rgb
+    Gamma("Gamma"):::nonlinear
+    Pack("Output Pack"):::nonlinear
 
-    subgraph Transition ["CFA to RGB Transition"]
-        demosaic["[5] Demosaic (Optimized)<br>Bilinear interpolation"]:::trans
-    end
-
-    subgraph RGB ["Linear RGB Domain"]
-        ccm["[6] ColorCorrectionMatrix<br>3x3 matrix conversion"]:::rgb
-    end
-
-    subgraph Output ["Non-Linear RGB & Output Domain"]
-        gamma["[7] GammaCorrection (sRGB)<br>Non-linear display curve"]:::nonlinear
-        pack["[8] OutputPack<br>Normalizes and clamps (float -> uint8)"]:::nonlinear
-        
-        gamma --> pack
-    end
-
-    %% Connect Subgraphs
-    wb --> demosaic
-    demosaic --> ccm
-    ccm --> gamma
+    %% Connections
+    Unpack --> BLC --> DPC --> LSC --> WB --> Demosaic --> CCM --> Gamma --> Pack
