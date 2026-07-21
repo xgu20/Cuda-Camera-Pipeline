@@ -1,0 +1,33 @@
+---
+description: Toolchain and build conventions for the LibreCudaISP project
+alwaysApply: true
+---
+
+# Project environment
+
+This project requires the CUDA Toolkit, CMake 3.25 or newer, and a host
+compiler with C++17 support. Do not assume contributors use a particular OS,
+GPU driver, CUDA minor version, or IDE.
+
+## Build conventions
+
+- Both the C++ and CUDA language standards are C++17.
+- Default CUDA architectures are `75;80;86;89`. Override them with
+  `-DCMAKE_CUDA_ARCHITECTURES=<sm>` for other GPUs.
+- Single-configuration generators default to Release. Pass
+  `-DCMAKE_BUILD_TYPE=Debug` explicitly for a debug build.
+- CMake downloads pinned versions of `nlohmann/json` and GoogleTest through
+  `FetchContent`, so the first configure requires network access.
+- `blocks/*.cu` is collected with `CONFIGURE_DEPENDS`; adding or removing a
+  block automatically triggers CMake reconfiguration.
+
+## Common commands
+
+```bash
+cmake -S . -B build && cmake --build build -j
+./build/libreisp data/<x>.raw out.png
+ctest --test-dir build --output-on-failure
+./build/tests/isp_tests --gtest_filter='*Perf*'
+```
+
+Build outputs are `build/libreisp` and `build/tests/isp_tests`.

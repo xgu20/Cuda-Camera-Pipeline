@@ -1,0 +1,20 @@
+graph LR
+    %% Style Definitions (Curated Pastel Palette)
+    classDef raw fill:#E0F2F1,stroke:#00796B,stroke-width:1.5px,rx:8px,ry:8px,color:#004D40,font-weight:bold,font-family:Helvetica;
+    classDef trans fill:#FFF9C4,stroke:#FBC02D,stroke-width:1.5px,rx:8px,ry:8px,color:#F57F17,font-weight:bold,font-family:Helvetica;
+    classDef rgb fill:#FFEBEE,stroke:#D32F2F,stroke-width:1.5px,rx:8px,ry:8px,color:#B71C1C,font-weight:bold,font-family:Helvetica;
+    classDef nonlinear fill:#F3E5F5,stroke:#7B1FA2,stroke-width:1.5px,rx:8px,ry:8px,color:#4A148C,font-weight:bold,font-family:Helvetica;
+
+    %% Nodes
+    Unpack("Raw Unpack"):::raw
+    BLC("Black Level"):::raw
+    DPC("Dead Pixel"):::raw
+    LSC("Lens Shading"):::raw
+    WB("White Balance"):::raw
+    Demosaic("Demosaic"):::trans
+    CCM("Color Matrix"):::rgb
+    Gamma("Gamma"):::nonlinear
+    Pack("Output Pack"):::nonlinear
+
+    %% Connections
+    Unpack --> BLC --> DPC --> LSC --> WB --> Demosaic --> CCM --> Gamma --> Pack

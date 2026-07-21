@@ -1,0 +1,20 @@
+---
+description: Keep the README accurate after code changes
+alwaysApply: true
+---
+
+# Keep the README accurate
+
+After changing blocks, CLI arguments, build settings, sidecar fields, or the
+directory layout, review `README.md` before finishing.
+
+Verify that:
+
+- The block list matches `blocks/*.cu` and `include/blocks.h`.
+- Build, run, and test commands can be copied and executed.
+- Sidecar fields match `src/sensor_config.cpp` and `src/frame_loader.cpp`.
+- Directory structure and dependency versions remain accurate.
+- FrameBuffer ownership and configuration precedence are documented correctly.
+
+Update the README when an inconsistency is clear. If the intended behavior is
+ambiguous, report the discrepancy instead of letting documentation drift.

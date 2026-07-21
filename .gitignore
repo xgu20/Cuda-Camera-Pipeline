@@ -1,0 +1,48 @@
+# ---------- Build output ----------
+build/
+out/
+cmake-build-*/
+
+# ---------- Editor / tooling caches ----------
+.cache/
+.vscode/
+.idea/
+*.swp
+*~
+
+# clangd index + compile_commands.json symlinks generated at the repo root
+compile_commands.json
+
+# ---------- Object / binary artifacts ----------
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.exe
+
+# ---------- Python ----------
+__pycache__/
+*.pyc
+
+# ---------- Test / pipeline outputs ----------
+# Renders produced by `isp_cuda` and gtest perf runs.
+output*.png
+*.ppm
+artifacts/
+
+# ---------- Test data ----------
+# Real raw corpora and synthetic_gen.py outputs are big and easy to regenerate;
+# never commit them. If you need a tiny canned sample, add it explicitly with
+# `git add -f data/the_one_file.raw`.
+data/
+
+# ---------- Profiling artifacts ----------
+# Nsight Systems / Compute reports generated during perf work.
+*.nsys-rep
+*.sqlite
+*.ncu-rep
+
+# ---------- OS junk ----------
+.DS_Store
+Thumbs.db

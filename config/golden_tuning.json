@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "modules": {
+    "black_level": {
+      "black_levels": [0, 0, 0, 0]
+    },
+    "sensor_linearization": {
+      "enabled": false,
+      "mode": "requires_sensor_lut"
+    },
+    "dead_pixel_correction": {
+      "threshold_policy": "sensor_range_default"
+    },
+    "lens_shading": {
+      "mode": "identity"
+    },
+    "white_balance": {
+      "mode": "gray_world"
+    },
+    "demosaic": {
+      "algorithm": "bilinear_optimized"
+    },
+    "color_correction": {
+      "matrix": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    },
+    "tone_mapping": {
+      "exposure": 1.0,
+      "curve": "aces_filmic"
+    },
+    "gamma": {
+      "curve": "srgb"
+    },
+    "yuv_denoise": {
+      "spatial_sigma": 2.0,
+      "luma_range_sigma": 0.025,
+      "chroma_range_sigma": 0.12,
+      "luma_strength": 0.40,
+      "chroma_strength": 1.00
+    },
+    "edge_enhancement": {
+      "strength": 1.5,
+      "threshold": 0.02,
+      "clamp_limit": 0.1
+    },
+    "output_pack": {
+      "format": "rgb_u8"
+    }
+  }
+}
