@@ -101,6 +101,31 @@ Compare with the upstream Infinite-ISP reference outputs:
 [Outdoor4](https://github.com/10x-Engineers/Infinite-ISP/blob/main/assets/Outdoor4.png).
 [Browse all upstream assets](https://github.com/10x-Engineers/Infinite-ISP/tree/main/assets).
 
+## Performance
+
+Steady-state measurements on an NVIDIA GeForce RTX 4070 Laptop GPU, using a
+Release build with CUDA Toolkit 12.9 and driver 592.82:
+
+| Resolution | Average GPU pipeline time | Throughput | Pixel rate |
+|---|---:|---:|---:|
+| 1920x1080 | 1.379 ms | 725.1 FPS | 1.503 Gpixel/s |
+| 3840x2160 (4K UHD) | 7.587 ms | 131.8 FPS | 1.093 Gpixel/s |
+
+Each result averages 100 measured frames after one excluded warm-up frame. The
+benchmark uses unpacked 10-bit RGGB input and the complete default/golden
+pipeline; sensor linearization is bypassed because no sensor-specific OECF LUT
+is supplied. Times are the sum of CUDA stage timings and exclude RAW loading,
+PNG encoding, and CLI logging. Laptop power mode, GPU clocks, driver, Toolkit,
+and tuning options can change these results.
+
+Reproduce the warm-up and averaging method with:
+
+```bash
+BENCH_ITERS=100 ./build/libreisp data/example.raw output.png
+```
+
+See [Testing and benchmarking](docs/testing.md) for timing details.
+
 ## Data and tuning
 
 RAW datasets are downloaded separately and are not committed to this repository.

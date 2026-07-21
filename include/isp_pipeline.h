@@ -42,6 +42,10 @@ public:
     // Print pipeline summary (block names, timing)
     void printSummary() const;
 
+    // Reset and print timing statistics accumulated by subsequent execute calls.
+    void resetTimingStatistics();
+    void printAverageSummary() const;
+
 private:
     std::vector<std::unique_ptr<ISPBlock>> blocks_;
     cudaStream_t stream_;
@@ -63,6 +67,8 @@ private:
 
     // Per-block timing (milliseconds)
     std::vector<float> timings_;
+    std::vector<double> timing_sums_;
+    size_t timing_samples_ = 0;
 
     void preparePool(const FrameBuffer& input);
     FrameBuffer executeFrom(FrameBuffer current);

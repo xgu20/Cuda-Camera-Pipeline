@@ -123,7 +123,44 @@ FrameBuffer ISPPipeline::executeFrom(FrameBuffer current) {
 
     // The final buffer stays owned by the pool (for reuse next frame); the
     // caller gets a non-owning view and must not free it.
+    if (timing_sums_.size() != timings_.size()) {
+        timing_sums_.assign(timings_.size(), 0.0);
+        timing_samples_ = 0;
+    }
+    for (size_t i = 0; i < timings_.size(); ++i) {
+        timing_sums_[i] += timings_[i];
+    }
+    ++timing_samples_;
     return current;
+}
+
+void ISPPipeline::resetTimingStatistics() {
+    timing_sums_.assign(blocks_.size(), 0.0);
+    timing_samples_ = 0;
+}
+
+void ISPPipeline::printAverageSummary() const {
+    if (timing_samples_ == 0) {
+        printf("\n=== ISP Average Pipeline Summary ===\n  No timing samples\n"
+               "====================================\n\n");
+        return;
+    }
+
+    printf("\n=== ISP Average Pipeline Summary (%zu frames) ===\n",
+           timing_samples_);
+    double total = 0.0;
+    for (size_t i = 0; i < blocks_.size(); ++i) {
+        if (blocks_[i]->isBypass()) {
+            printf("  [%zu] %-30s  (Bypassed)\n", i, blocks_[i]->name());
+        } else {
+            const double average = timing_sums_[i] / timing_samples_;
+            printf("  [%zu] %-30s  %.3f ms\n", i, blocks_[i]->name(), average);
+            total += average;
+        }
+    }
+    printf("  %-34s  %.3f ms (%.1f FPS)\n", "AVERAGE TOTAL", total,
+           total > 0.0 ? 1000.0 / total : 0.0);
+    printf("===============================================\n\n");
 }
 
 void ISPPipeline::printSummary() const {

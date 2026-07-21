@@ -62,8 +62,10 @@ BENCH_ITERS=100 ./build/libreisp data/example.raw output.png \
   --config data/shared-sensor.json
 ```
 
-The first iteration includes one-time buffer allocation. Later iterations reuse
-pipeline buffers. The CLI prints per-stage and total timing.
+`BENCH_ITERS=N` runs one warm-up frame to allocate and populate reusable
+pipeline buffers, excludes it, and then reports per-stage averages across N
+measured frames. FPS is calculated from the average summed GPU stage time; it
+does not include RAW file loading, PNG encoding, or CLI logging.
 
 `execute()` permits in-place blocks to consume the input. Benchmarks use this
 zero-copy path. Use `executePreservingInput()` in application code when the

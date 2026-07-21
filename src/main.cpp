@@ -202,23 +202,28 @@ int main(int argc, char *argv[]) {
 		output_pack->setBypass(!cfg.enable_output_pack);
 		pipeline.addBlock(std::move(output_pack));
 
-		// Optional steady-state benchmark: run the pipeline N times on the same
-		// input (set BENCH_ITERS). The first frame pays the one-time buffer
-		// allocation; subsequent frames reuse the pool and show steady-state
-		// cost.
+		// Optional steady-state benchmark: BENCH_ITERS=N runs one unmeasured
+		// warm-up frame, then reports the per-stage average of N measured frames.
 		const char *iters_env = getenv("BENCH_ITERS");
-		const int iters =
-			(iters_env && atoi(iters_env) > 0) ? atoi(iters_env) : 1;
+		const int benchmark_iters =
+			(iters_env && atoi(iters_env) > 0) ? atoi(iters_env) : 0;
 
 		printf("Processing pipeline:\n");
 		FrameBuffer result{};
-		for (int it = 0; it < iters; ++it) {
-			if (iters > 1)
-				printf("--- frame %d/%d ---\n", it + 1, iters);
+		if (benchmark_iters > 0) {
+			printf("--- warm-up frame (excluded from averages) ---\n");
 			result = pipeline.execute(input);
+			pipeline.resetTimingStatistics();
+			for (int it = 0; it < benchmark_iters; ++it) {
+				printf("--- measured frame %d/%d ---\n", it + 1,
+					   benchmark_iters);
+				result = pipeline.execute(input);
+			}
+			pipeline.printAverageSummary();
+		} else {
+			result = pipeline.execute(input);
+			pipeline.printSummary();
 		}
-
-		pipeline.printSummary();
 
 		loader.savePNG(result, output_path);
 
