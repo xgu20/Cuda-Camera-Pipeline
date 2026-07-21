@@ -2,7 +2,7 @@
 // LibreCudaISP — Main Entry Point
 //
 // Usage:
-//   ./libreisp <input.raw> [output.png]
+//   ./libreisp <input.raw> [output.png] [--config sensor.json]
 //
 // The sensor metadata
 // (width/height/bit_depth/bayer_pattern/packing/black_level) is read from a
@@ -25,15 +25,18 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 void printUsage(const char *prog) {
 	printf("LibreCudaISP\n");
-	printf("Usage: %s <input.raw> [output.png]\n\n", prog);
+	printf("Usage: %s <input.raw> [output.png] [--config sensor.json]\n\n", prog);
 	printf("  input.raw   — Raw sensor file. A JSON sidecar with the same\n");
 	printf(
 		"                stem (e.g. input.json) describes its dimensions,\n");
-	printf("                bit depth, bayer pattern, packing, etc.\n");
+	printf("                bit depth, bayer pattern, packing, etc., unless\n");
+	printf("                --config is provided.\n");
 	printf("  output.png  — Output PNG file (default: output.png)\n");
+	printf("  -c, --config — Explicit JSON config, reusable across RAW files\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -46,21 +49,55 @@ int main(int argc, char *argv[]) {
 	// user-provided override.
 	setenv("CUDA_MODULE_LOADING", "EAGER", 0);
 
-	if (argc < 2) {
+	std::string config_path;
+	std::vector<std::string> positional;
+	for (int i = 1; i < argc; ++i) {
+		const std::string arg = argv[i];
+		if (arg == "-h" || arg == "--help") {
+			printUsage(argv[0]);
+			return 0;
+		}
+		if (arg == "-c" || arg == "--config") {
+			if (++i >= argc) {
+				fprintf(stderr, "%s requires a JSON path\n", arg.c_str());
+				return 1;
+			}
+			config_path = argv[i];
+			continue;
+		}
+		if (arg.rfind("--config=", 0) == 0) {
+			config_path = arg.substr(std::string("--config=").size());
+			if (config_path.empty()) {
+				fprintf(stderr, "--config requires a JSON path\n");
+				return 1;
+			}
+			continue;
+		}
+		if (!arg.empty() && arg[0] == '-') {
+			fprintf(stderr, "Unknown option: %s\n", arg.c_str());
+			return 1;
+		}
+		positional.push_back(arg);
+	}
+
+	if (positional.empty() || positional.size() > 2) {
 		printUsage(argv[0]);
 		return 1;
 	}
 
-	const std::string input_path = argv[1];
-	const std::string output_path = (argc >= 3) ? argv[2] : "output.png";
-	const std::string sidecar_path = defaultSidecarPath(input_path);
+	const std::string input_path = positional[0];
+	const std::string output_path =
+		(positional.size() == 2) ? positional[1] : "output.png";
+	const std::string sidecar_path =
+		config_path.empty() ? defaultSidecarPath(input_path) : config_path;
 	const char *golden_env = getenv("GOLDEN_TUNING_FILE");
 	const std::string golden_tuning_path =
 		golden_env ? golden_env : "config/golden_tuning.json";
 
 	printf("=== LibreCudaISP ===\n");
 	printf("  Input:   %s\n", input_path.c_str());
-	printf("  Sidecar: %s\n", sidecar_path.c_str());
+	printf("  Sensor config: %s%s\n", sidecar_path.c_str(),
+		   config_path.empty() ? " (sidecar)" : " (explicit)");
 	printf("  Golden tuning: %s\n", golden_tuning_path.c_str());
 	printf("  Output:  %s\n\n", output_path.c_str());
 

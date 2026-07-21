@@ -58,6 +58,8 @@ For end-to-end steady-state timing, run the application repeatedly on one frame:
 
 ```bash
 BENCH_ITERS=100 ./build/libreisp data/example.raw output.png
+BENCH_ITERS=100 ./build/libreisp data/example.raw output.png \
+  --config data/shared-sensor.json
 ```
 
 The first iteration includes one-time buffer allocation. Later iterations reuse

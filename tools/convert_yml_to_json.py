@@ -114,16 +114,26 @@ def convert_directory(directory: Path) -> list[Path]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "directory",
+        "input",
         nargs="?",
         type=Path,
         default=Path("data/infinite"),
-        help="directory containing *-configs.yml files (default: data/infinite)",
+        help="a YAML file or directory containing *-configs.yml files",
+    )
+    parser.add_argument(
+        "-o", "--output", type=Path,
+        help="output JSON path (only valid when input is a file)",
     )
     args = parser.parse_args()
-    outputs = convert_directory(args.directory)
+    if args.input.is_file():
+        output = convert_config(args.input, args.output)
+        print(f"Converted {args.input} -> {output}")
+        return
+    if args.output is not None:
+        parser.error("--output is only valid when input is a file")
+    outputs = convert_directory(args.input)
     if not outputs:
-        raise SystemExit(f"No *-configs.yml files found in {args.directory}")
+        raise SystemExit(f"No *-configs.yml files found in {args.input}")
 
 
 if __name__ == "__main__":

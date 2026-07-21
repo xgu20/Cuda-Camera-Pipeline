@@ -1,7 +1,7 @@
 # LibreCudaISP
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![CUDA 11+](https://img.shields.io/badge/CUDA-11%2B-76B900?logo=nvidia&logoColor=white)
+![CUDA 11.8+](https://img.shields.io/badge/CUDA-11.8%2B-76B900?logo=nvidia&logoColor=white)
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus)
 
 **A CUDA C++ camera image signal processor for converting Bayer RAW sensor
@@ -22,14 +22,48 @@ are pixel-format or color-space transitions.
 
 ## Quick start
 
-You need an NVIDIA GPU, CUDA Toolkit 11+, CMake 3.25+, a C++17 compiler, and
-network access during the first build.
+### Requirements
+
+- An NVIDIA GPU supported by the default CUDA architectures (Turing, Ampere,
+  or Ada), with an NVIDIA driver compatible with the installed CUDA Toolkit
+- CUDA Toolkit 11.8 or newer, including `nvcc`
+- CMake 3.25 or newer and a C++17 compiler supported by that CUDA Toolkit
+- Python 3.9 or newer for the data download and configuration tools
+- Network access during the first build, because CMake downloads nlohmann/json
+  and GoogleTest
+
+The C++ executable has no Python runtime dependency. Python packages are only
+needed by the optional data tools:
+
+- PyYAML converts YAML sensor tuning to LibreCudaISP JSON.
+- Kaggle is needed only when downloading the Kaggle dataset.
+- NumPy and Pillow are needed only by the synthetic RAW generator.
+
+Install all data-tool dependencies with:
+
+```bash
+python3 -m pip install -r requirements-data.txt
+```
+
+Confirm that the driver and Toolkit are visible before building:
+
+```bash
+nvidia-smi
+nvcc --version
+```
+
+CUDA 11.8 is the default minimum because the CMake target list includes Ada
+(`sm_89`). An earlier CUDA 11 Toolkit may work for an older GPU when configured
+with only an architecture supported by that Toolkit, for example
+`-DCMAKE_CUDA_ARCHITECTURES=75`.
+
+### Build and run
 
 ```bash
 git clone https://github.com/xgu20/LibreCudaISP.git
 cd LibreCudaISP
 
-python3 -m pip install PyYAML
+python3 -m pip install -r requirements-data.txt
 python3 tools/download_data.py infinite
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -102,6 +136,25 @@ Then run:
 ```bash
 ./build/libreisp data/example.raw output.png
 ```
+
+For a sequence captured with the same sensor settings, convert one tuning file
+and pass the resulting JSON explicitly for every RAW frame:
+
+```bash
+python3 tools/convert_yml_to_json.py data/capture/configs.yml
+./build/libreisp data/capture/RAW1.raw output.png \
+  --config data/capture/configs.json
+```
+
+An explicit `--config` (or `-c`) overrides same-stem sidecar discovery. Batch
+processing can reuse the same JSON without copying it beside every frame:
+
+```bash
+python3 run_all.py --input-dir data/capture --config data/capture/configs.json
+```
+
+Add `--recursive` when frames are grouped in subdirectories; the same layout is
+preserved below the output directory so repeated frame names do not collide.
 
 [config/golden_tuning.json](config/golden_tuning.json) provides generic defaults;
 the sidecar supplies sensor- and capture-specific values. The sidecar schema and

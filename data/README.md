@@ -21,12 +21,23 @@ scene.raw
 scene.json
 ```
 
+Alternatively, pass one shared JSON explicitly. This is useful for video or
+burst frames captured with identical dimensions, packing, Bayer layout, black
+level, and calibration:
+
+```bash
+./build/libreisp scene.raw scene.png --config configs.json
+```
+
+The explicit config overrides same-stem sidecar discovery. Do not share it
+between captures whose sensor format or calibration differs.
+
 ## Option 1: generate synthetic data
 
 This is the quickest way to run the project without downloading a dataset:
 
 ```bash
-python3 -m pip install numpy Pillow
+python3 -m pip install -r requirements-data.txt
 mkdir -p data/synthetic
 python3 tools/synthetic_gen.py \
   --input /path/to/input.png \
@@ -168,6 +179,15 @@ fields into JSON sidecars with:
 
 ```bash
 python3 tools/convert_yml_to_json.py data/infinite
+```
+
+A single YAML file, including a generically named `configs.yml`, can be
+converted directly and reused for a whole capture sequence:
+
+```bash
+python3 tools/convert_yml_to_json.py data/kaggle/capture/configs.yml
+python3 run_all.py --input-dir data/kaggle/capture \
+  --config data/kaggle/capture/configs.json --recursive
 ```
 
 The helper is available at
